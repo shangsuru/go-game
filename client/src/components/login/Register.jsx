@@ -20,7 +20,7 @@ const Register = () => {
     api
       .post('/users', { username, email, password })
       .then((res) => {
-        localStorage.setItem('jwt', res.data.token);
+        localStorage.setItem('jwt', res.data);
         history.push('/');
       })
       .catch((error) => {
