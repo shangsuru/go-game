@@ -1,7 +1,6 @@
 package server.api.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.apache.coyote.Response;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -12,6 +11,7 @@ import server.api.model.User;
 import server.api.repository.GameRepository;
 import server.api.repository.UserRepository;
 import server.api.security.JWTUtils;
+
 import java.util.Optional;
 
 
@@ -32,6 +32,11 @@ public class UserController {
 
     @PostMapping
     public ResponseEntity<String> register(@RequestBody User user) {
+        // Check if username or email already exists
+        if (!userRepository.findByUsernameOrEmail(user.getUsername(), user.getEmail()).isEmpty()) {
+            return new ResponseEntity<>("Username or email already taken", HttpStatus.BAD_REQUEST);
+        }
+
         user.setPassword(bCryptPasswordEncoder.encode(user.getPassword()));
         userRepository.save(user);
         return new ResponseEntity<>(jwtUtils.createJWT(user.getUsername()), HttpStatus.CREATED);
@@ -47,15 +52,15 @@ public class UserController {
         }
     }
 
-   @GetMapping("/me")
+    @GetMapping("/me")
     public UserDTO getCurrentUserInfo() {
-        User user =  ((User) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+        User user = ((User) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
         return new UserDTO(user, gameRepository);
     }
 
     @PatchMapping("/me")
     public UserDTO updateCurrentUserInfo(@RequestBody JsonNode updates) {
-        User user =  ((User) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+        User user = ((User) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
 
         if (updates.has("email")) {
             user.setEmail(updates.get("email").asText());
@@ -78,7 +83,7 @@ public class UserController {
         if (updates.has("surName")) {
             user.setSurName(updates.get("surName").asText());
         }
-
+        userRepository.save(user);
         return new UserDTO(user, gameRepository);
     }
 

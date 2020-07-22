@@ -23,9 +23,8 @@ const Register = () => {
         localStorage.setItem('jwt', res.data);
         history.push('/');
       })
-      .catch((error) => {
+      .catch(() => {
         createErrorMessage('Username or email not available.');
-        console.log(error);
       });
   };
 

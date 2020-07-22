@@ -9,6 +9,7 @@ import javax.persistence.Id;
 import java.time.Instant;
 import java.util.Date;
 
+
 @Entity
 public class Game {
     private String player1;

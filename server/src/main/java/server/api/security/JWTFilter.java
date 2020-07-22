@@ -1,6 +1,5 @@
 package server.api.security;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.GenericFilterBean;
@@ -12,6 +11,7 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
 
+
 public class JWTFilter extends GenericFilterBean {
     private final JWTUtils jwtUtils;
 
@@ -21,7 +21,7 @@ public class JWTFilter extends GenericFilterBean {
 
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain filterChain) throws IOException, ServletException {
-        String token = jwtUtils.resolveToken((HttpServletRequest) req);
+        String token = jwtUtils.getTokenFromHeader((HttpServletRequest) req);
         if (token != null && jwtUtils.validateJWT(token)) {
             Authentication auth = jwtUtils.getAuthentication(token);
             SecurityContextHolder.getContext().setAuthentication(auth);

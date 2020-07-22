@@ -30,23 +30,13 @@ const Settings = () => {
           Authorization: 'Bearer ' + token,
         },
       })
-      .then((result) => {
-        const user = result.data.user;
-        if (user.country) {
-          setCountry(user.country);
-        }
-        if (user.location) {
-          setLocation(user.location);
-        }
-        if (user.biography) {
-          setBiography(user.biography);
-        }
-        if (user.givenName) {
-          setGivenName(user.givenName);
-        }
-        if (user.surName) {
-          setSurName(user.surName);
-        }
+      .then((res) => {
+        const {country, location, biography, givenName, surName} = res.data
+        setCountry(country);
+        setLocation(location);
+        setBiography(biography);
+        setGivenName(givenName);
+        setSurName(surName);
       });
   }, []);
 

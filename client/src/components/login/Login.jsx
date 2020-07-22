@@ -11,12 +11,12 @@ const Login = () => {
 
   const handleLogin = () => {
     api
-      .post('/users/login', { name, password })
+      .post('/users/login', { username: name, password })
       .then((res) => {
-        localStorage.setItem('jwt', res.data.token);
+        localStorage.setItem('jwt', res.data);
         history.push('/');
       })
-      .catch((error) => {
+      .catch(() => {
         createErrorMessage('Username or password is invalid.');
       });
   };

@@ -35,7 +35,7 @@ public class GameController {
     public ResponseEntity<Game> getActiveGamesOfPlayers(@RequestParam String player1, @RequestParam String player2) {
         Game mostRecentGame =  gameRepository.findFirstByPlayer1AndPlayer2OrderByTimestampDesc(player1, player2);
         if (mostRecentGame.isGameTerminated()) {
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT); // no active game
+            return new ResponseEntity<>(HttpStatus.NO_CONTENT); // No active game
         }
 
         return new ResponseEntity<>(mostRecentGame, HttpStatus.OK);
@@ -50,8 +50,8 @@ public class GameController {
         long losses = games.size() - wins;
 
         int limit = 7;
-        int skip = (page - 1) * limit; // pagination
-        return new OwnGamesDTO(games.subList(skip, skip + limit), wins, losses);
+        int skip = (page - 1) * limit; // Pagination
+        return new OwnGamesDTO(games.subList(skip, Math.min(skip + limit, games.size())), wins, losses);
     }
 
     @PatchMapping("/{id}")
@@ -79,6 +79,7 @@ public class GameController {
         game.setPlayer1Winner(player1Won);
         game.setNewRatingPlayer1(ratingPlayer1);
         game.setNewRatingPlayer2(ratingPlayer2);
+        game.setGameTerminated(true);
         return new ResponseEntity<>(game, HttpStatus.OK);
     }
 

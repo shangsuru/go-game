@@ -49,12 +49,11 @@ public class JWTUtils {
         }
     }
 
-    public String resolveToken(HttpServletRequest req) {
+    public String getTokenFromHeader(HttpServletRequest req) {
         String bearerToken = req.getHeader("Authorization");
         if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
             return bearerToken.substring(7);
         }
         return null;
     }
-
 }

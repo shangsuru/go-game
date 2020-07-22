@@ -56,18 +56,16 @@ const Main = () => {
         },
       })
       .then((res) => {
-        const user = res.data.user;
-        const ratings = res.data.ratings;
-
-        setUserId(user.id);
-        setUsername(user.username);
+        const {id, username, ratings} = res.data
+        setUserId(id);
+        setUsername(username);
         setOwnRating(ratings[0].rating);
 
-        localStorage.setItem('username', user.username);
+        localStorage.setItem('username', username);
         socket = socketIOClient('http://localhost:8000');
 
-        // submit username to server
-        socket.emit('online', user.username);
+        // Submit username to server
+        socket.emit('online', username);
         socket.on('challenges', (data) => {
           // Receive open challenges
           setChallenges(data);
@@ -75,7 +73,7 @@ const Main = () => {
         // Get Notified that challenge got accepted
         socket.on('acceptChallenge', (data) => {
           // If the accepted challenge was the current user's challenge
-          if (data.createdChallenge === res.data.username) {
+          if (data.createdChallenge === username) {
             alert(data.acceptedChallenge + ' has accepted your challenge!');
           }
           // Redirect to game page

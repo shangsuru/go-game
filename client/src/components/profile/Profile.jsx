@@ -19,8 +19,8 @@ const Profile = () => {
   const [memberSince, setMemberSince] = useState('May 31, 2016');
   const [biography, setBiography] = useState('');
   const [ratings, setRatings] = useState([]);
-  const [wins, setWins] = useState(7);
-  const [losses, setLosses] = useState(3);
+  const [wins, setWins] = useState(0);
+  const [losses, setLosses] = useState(0);
   const [games, setGames] = useState([]);
   const [userNotFound, setUserNotFound] = useState(false);
   const [page, setPage] = useState(1);
@@ -41,19 +41,19 @@ const Profile = () => {
           Authorization: 'Bearer ' + token,
         },
       })
-      .then((result) => {
-        const user = result.data.user;
-        setUsername(user.username);
-        setGivenName(user.givenName);
-        setSurName(user.surName);
-        setCity(user.location);
-        setCountry(user.country);
-        setBiography(user.biography);
-        setMemberSince(moment(user.memberSince).format('LL'));
+      .then((res) => {
+        const {username, givenName, surName, location, country, biography, memberSince} = res.data
+        setUsername(username);
+        setGivenName(givenName);
+        setSurName(surName);
+        setCity(location);
+        setCountry(country);
+        setBiography(biography);
+        setMemberSince(moment(memberSince).format('LL'));
 
         // Create graph coordinates for rating graph
         let ratings = [];
-        for (let rating of result.data.ratings) {
+        for (let rating of res.data.ratings) {
           ratings.push({ x: new Date(rating.time), y: rating.rating });
         }
         setRatings(ratings);
@@ -61,7 +61,7 @@ const Profile = () => {
         // Fetch games
         api
           .get(
-            `games/${result.data.user.username}`,
+            `games/${username}`,
 
             {
               params: { page },
@@ -70,11 +70,10 @@ const Profile = () => {
               },
             }
           )
-          .then((result) => {
-            console.log(result);
-            setGames(result.data.games);
-            setWins(result.data.wins);
-            setLosses(result.data.losses);
+          .then((res) => {
+            setGames(res.data.games);
+            setWins(res.data.wins);
+            setLosses(res.data.losses);
           });
       })
       .catch((e) => {
