@@ -59,7 +59,7 @@ const Main = () => {
         const user = res.data.user;
         const ratings = res.data.ratings;
 
-        setUserId(user._id);
+        setUserId(user.id);
         setUsername(user.username);
         setOwnRating(ratings[0].rating);
 

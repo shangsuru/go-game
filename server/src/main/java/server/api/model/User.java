@@ -1,5 +1,7 @@
 package server.api.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.hibernate.annotations.CreationTimestamp;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -10,6 +12,7 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.Date;
 
 
 @Entity
@@ -17,12 +20,13 @@ public class User implements UserDetails {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
-    @CreatedDate
-    private LocalDateTime memberSince;
+    @CreationTimestamp
+    private Date memberSince;
     private String username;
     private String email;
     private String password;
     private String country;
+    private String location;
     private String biography;
     private String givenName;
     private String surName;
@@ -32,11 +36,9 @@ public class User implements UserDetails {
         return id;
     }
 
-    public LocalDateTime getMemberSince() {
+    public Date getMemberSince() {
         return memberSince;
     }
-
-
 
     public String getUsername() {
         return username;
@@ -73,6 +75,14 @@ public class User implements UserDetails {
 
     public void setCountry(String country) {
         this.country = country;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
     }
 
     public String getBiography() {

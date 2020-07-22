@@ -1,5 +1,6 @@
 package server.api.repository;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.data.jpa.repository.JpaRepository;
 import server.api.model.User;
 
