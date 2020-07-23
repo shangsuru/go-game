@@ -31,7 +31,7 @@ export default class ResetPassword extends Component {
     } = this.props;
     try {
       const response = await api
-        .get('/users/resetpassword', { params: { token: token } })
+        .get(`/users/resetpassword/${token}`)
         .catch((err) => {
           console.log(err.stack);
         });
@@ -80,27 +80,19 @@ export default class ResetPassword extends Component {
       .patch('/users/resetpassword', {
         username: this.state.username,
         password: this.state.password,
-        token: token,
+      },{
+        headers: {
+          Authorization: 'Bearer ' + token,
+        }
       })
       .then((res) => {
         if (res.status === 201) {
           this.setState({ updated: true });
-        } else if (res.data === 'TOKENERR') {
-          this.setState({
-            servererror: true,
-            servererrormsg:
-              'Invalid Token. Try again by requesting another password reset!',
-          });
-        } else if (res.data === 'INVALIDREQUEST') {
-          this.setState({
-            servererror: true,
-            servererrormsg: 'There is no password request for this user.',
-          });
         } else {
           this.setState({
             servererror: true,
             servererrormsg:
-              'Server Database error. Please try another password reset later.',
+              'Invalid Token. Try again by requesting another password reset!',
           });
         }
       })
@@ -200,7 +192,6 @@ export default class ResetPassword extends Component {
 }
 
 ResetPassword.propTypes = {
-  // eslint-disable-next-line react/require-default-props
   match: PropTypes.shape({
     params: PropTypes.shape({
       token: PropTypes.string.isRequired,

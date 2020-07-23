@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
-import { Button, Card, Input } from 'antd';
-import { CheckOutlined } from '@ant-design/icons';
+import React, {useState} from 'react';
+import {Button, Card, Input} from 'antd';
+import {CheckOutlined} from '@ant-design/icons';
 import history from '../../history';
 import api from '../../api';
 
 const PasswordResetRequest = () => {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
-  const [sent, setSent] = useState(false);
 
   const createErrorMessage = (error) => {
     setError(error);
@@ -20,15 +19,17 @@ const PasswordResetRequest = () => {
       return;
     }
     api
-      .post('/users/forgotpassword', { email })
+      .post('/users/resetpassword', {email})
       .then((res) => {
-        if (res.data === 'SUCCESS') setSent(true);
-        else if (res.data === 'USERNOTFOUND')
-          createErrorMessage('Username or Email not found.');
-        else
+        if (res.status === 200) {
+          createErrorMessage("An email has been sent to you with a link to reset your password.");
+        } else if (res.status === 204) {
+          createErrorMessage('No user with that email found.');
+        } else {
           createErrorMessage(
             'Unknown error occurred. If this keeps happening please contact tudagrouphs@gmail.com.'
           );
+        }
       })
       .catch((err) => {
         console.log(err);
@@ -45,46 +46,29 @@ const PasswordResetRequest = () => {
     }
   };
 
-  if (!sent)
-    return (
-      <div className='entry'>
-        <Card>
-          <h1 className='entry__title'>Password reset</h1>
-          <p className='entry__error'>{error}</p>
-          <div className='entry__input'>
-            Email or Username
-            <Input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onKeyPress={(e) => handleKeyPress(e)}
-            />
-          </div>
-          <Button
-            type='primary'
-            className='entry__button'
-            onClick={() => handleReset()}
-          >
-            <CheckOutlined /> Email me a link
-          </Button>
-        </Card>
-      </div>
-    );
-  else
-    return (
-      <div className='entry'>
-        <Card>
-          <h1 className='entry__title'>Success!</h1>
-          <p className='entry__message'>Email has been sent!</p>
-          <Button
-            type='primary'
-            className='entry__button'
-            onClick={returnToLogin()}
-          >
-            <CheckOutlined /> Return to login screen
-          </Button>
-        </Card>
-      </div>
-    );
+  return (
+    <div className='entry'>
+      <Card>
+        <h1 className='entry__title'>Password reset</h1>
+        <p className='entry__error'>{error}</p>
+        <div className='entry__input'>
+          Email
+          <Input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyPress={(e) => handleKeyPress(e)}
+          />
+        </div>
+        <Button
+          type='primary'
+          className='entry__button'
+          onClick={() => handleReset()}
+        >
+          <CheckOutlined/> Email me a link
+        </Button>
+      </Card>
+    </div>
+  );
 };
 
 export default PasswordResetRequest;
