@@ -43,10 +43,10 @@ public class UserDTO {
         List<Game> games = gameRepository.findByPlayer1OrPlayer2OrderByTimestampDesc(username, username);
         // Get a list of rating and timestamp for each game played
         List<Rating> ratings = games.stream()
-                                    .map(game -> new Rating(
-                                            game.getTimestamp(),
-                                            game.getPlayer1().equals(username) ? game.getNewRatingPlayer1() : game.getNewRatingPlayer2()))
-                                    .collect(Collectors.toList());
+                .map(game -> new Rating(
+                        game.getTimestamp(),
+                        game.getPlayer1().equals(username) ? game.getNewRatingPlayer1() : game.getNewRatingPlayer2()))
+                .collect(Collectors.toList());
 
         // Save only the most recent rating for each day
         List<Rating> dailyRatings = new ArrayList<>();

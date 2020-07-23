@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.Date;
+
 import static com.auth0.jwt.algorithms.Algorithm.HMAC512;
 
 
@@ -31,6 +32,13 @@ public class JWTUtils {
                 .sign(HMAC512(SECRET.getBytes()));
     }
 
+    public String createJWT(String username, long expirationTime) {
+        return JWT.create()
+                .withSubject(username)
+                .withExpiresAt(new Date(System.currentTimeMillis() + expirationTime))
+                .sign(HMAC512(SECRET.getBytes()));
+    }
+
     public Authentication getAuthentication(String token) {
         UserDetails userDetails = this.userDetailsService.loadUserByUsername(getUsernameFromJWT(token));
         return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
@@ -44,7 +52,7 @@ public class JWTUtils {
         try {
             DecodedJWT jwt = JWT.require(Algorithm.HMAC512(SECRET.getBytes())).build().verify(token);
             return true;
-        } catch(JWTVerificationException e) {
+        } catch (JWTVerificationException e) {
             return false;
         }
     }

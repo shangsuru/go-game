@@ -30,10 +30,12 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     protected void configure(HttpSecurity http) throws Exception {
         String SIGN_IN_URL = "/users/login";
         String SIGN_UP_URL = "/users";
+        String PASSWORD_RESET = "/users/resetpassword/**";
 
         http.csrf().disable().cors().and()
                 .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS).and()
-                .authorizeRequests().antMatchers(HttpMethod.POST, SIGN_IN_URL, SIGN_UP_URL).permitAll()
+                .authorizeRequests().antMatchers(HttpMethod.POST, SIGN_UP_URL, SIGN_IN_URL, PASSWORD_RESET).permitAll()
+                .antMatchers(HttpMethod.GET, PASSWORD_RESET).permitAll()
                 .anyRequest().authenticated().and()
                 .apply(new JWTConfigurer(jwtUtils));
     }

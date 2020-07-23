@@ -44,10 +44,11 @@ public class Game {
         this.player1Winner = player1Winner;
     }
 
-    protected Game() {}
+    protected Game() {
+    }
 
     @Id
-    @GeneratedValue(strategy= GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
 
     public Long getId() {
