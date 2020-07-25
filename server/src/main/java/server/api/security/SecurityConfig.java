@@ -17,40 +17,40 @@ import java.util.List;
 
 @Configuration
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
-    @Autowired
-    JWTUtils jwtUtils;
+  @Autowired
+  JWTUtils jwtUtils;
 
-    @Bean
-    @Override
-    public AuthenticationManager authenticationManagerBean() throws Exception {
-        return super.authenticationManagerBean();
-    }
+  @Bean
+  @Override
+  public AuthenticationManager authenticationManagerBean() throws Exception {
+    return super.authenticationManagerBean();
+  }
 
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        String SIGN_IN_URL = "/users/login";
-        String SIGN_UP_URL = "/users";
-        String PASSWORD_RESET = "/users/resetpassword/**";
+  @Override
+  protected void configure(HttpSecurity http) throws Exception {
+    String SIGN_IN_URL = "/users/login";
+    String SIGN_UP_URL = "/users";
+    String PASSWORD_RESET = "/users/resetpassword/**";
 
 
-        http.csrf().disable().cors().and()
-                .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS).and()
-                .authorizeRequests().antMatchers(SIGN_UP_URL, SIGN_IN_URL, PASSWORD_RESET, "/ws/**").permitAll()
-                .anyRequest().authenticated().and()
-                .apply(new JWTConfigurer(jwtUtils));
-    }
+    http.csrf().disable().cors().and()
+      .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS).and()
+      .authorizeRequests().antMatchers(SIGN_UP_URL, SIGN_IN_URL, PASSWORD_RESET, "/ws/**").permitAll()
+      .anyRequest().authenticated().and()
+      .apply(new JWTConfigurer(jwtUtils));
+  }
 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        final CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("*"));
-        configuration.setAllowedMethods(List.of("HEAD",
-                "GET", "POST", "PUT", "DELETE", "PATCH"));
-        configuration.setAllowCredentials(true);
-        configuration.setAllowedHeaders(List.of("Authorization", "Cache-Control", "Content-Type"));
-        final UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
-    }
+  @Bean
+  public CorsConfigurationSource corsConfigurationSource() {
+    final CorsConfiguration configuration = new CorsConfiguration();
+    configuration.setAllowedOrigins(List.of("*"));
+    configuration.setAllowedMethods(List.of("HEAD",
+      "GET", "POST", "PUT", "DELETE", "PATCH"));
+    configuration.setAllowCredentials(true);
+    configuration.setAllowedHeaders(List.of("Authorization", "Cache-Control", "Content-Type"));
+    final UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", configuration);
+    return source;
+  }
 
 }

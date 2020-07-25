@@ -19,49 +19,49 @@ import static com.auth0.jwt.algorithms.Algorithm.HMAC512;
 
 @Component
 public class JWTUtils {
-    private final String SECRET = "secret";
-    private final long EXPIRATION_TIME = 86_400_000; // 1 day
+  private final String SECRET = "secret";
+  private final long EXPIRATION_TIME = 86_400_000; // 1 day
 
-    @Autowired
-    private CustomUserDetailsService userDetailsService;
+  @Autowired
+  private CustomUserDetailsService userDetailsService;
 
-    public String createJWT(String username) {
-        return JWT.create()
-                .withSubject(username)
-                .withExpiresAt(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
-                .sign(HMAC512(SECRET.getBytes()));
+  public String createJWT(String username) {
+    return JWT.create()
+      .withSubject(username)
+      .withExpiresAt(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
+      .sign(HMAC512(SECRET.getBytes()));
+  }
+
+  public String createJWT(String username, long expirationTime) {
+    return JWT.create()
+      .withSubject(username)
+      .withExpiresAt(new Date(System.currentTimeMillis() + expirationTime))
+      .sign(HMAC512(SECRET.getBytes()));
+  }
+
+  public Authentication getAuthentication(String token) {
+    UserDetails userDetails = this.userDetailsService.loadUserByUsername(getUsernameFromJWT(token));
+    return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
+  }
+
+  public String getUsernameFromJWT(String token) {
+    return JWT.decode(token).getSubject();
+  }
+
+  public boolean validateJWT(String token) {
+    try {
+      DecodedJWT jwt = JWT.require(Algorithm.HMAC512(SECRET.getBytes())).build().verify(token);
+      return true;
+    } catch (JWTVerificationException e) {
+      return false;
     }
+  }
 
-    public String createJWT(String username, long expirationTime) {
-        return JWT.create()
-                .withSubject(username)
-                .withExpiresAt(new Date(System.currentTimeMillis() + expirationTime))
-                .sign(HMAC512(SECRET.getBytes()));
+  public String getTokenFromHeader(HttpServletRequest req) {
+    String bearerToken = req.getHeader("Authorization");
+    if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+      return bearerToken.substring(7);
     }
-
-    public Authentication getAuthentication(String token) {
-        UserDetails userDetails = this.userDetailsService.loadUserByUsername(getUsernameFromJWT(token));
-        return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
-    }
-
-    public String getUsernameFromJWT(String token) {
-        return JWT.decode(token).getSubject();
-    }
-
-    public boolean validateJWT(String token) {
-        try {
-            DecodedJWT jwt = JWT.require(Algorithm.HMAC512(SECRET.getBytes())).build().verify(token);
-            return true;
-        } catch (JWTVerificationException e) {
-            return false;
-        }
-    }
-
-    public String getTokenFromHeader(HttpServletRequest req) {
-        String bearerToken = req.getHeader("Authorization");
-        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
-            return bearerToken.substring(7);
-        }
-        return null;
-    }
+    return null;
+  }
 }

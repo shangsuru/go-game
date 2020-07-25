@@ -11,19 +11,19 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 @SpringBootApplication
 public class ApiApplication {
 
-	@Autowired
-	private Environment environment;
+  @Autowired
+  private Environment environment;
 
-	@Value("${GO_GAME_EMAIL_PASSWORD")
-	private String emailPassword;
+  @Value("${GO_GAME_EMAIL_PASSWORD")
+  private String emailPassword;
 
-	public static void main(String[] args) {
-		SpringApplication.run(ApiApplication.class, args);
-	}
+  public static void main(String[] args) {
+    SpringApplication.run(ApiApplication.class, args);
+  }
 
-	@Bean
-	public BCryptPasswordEncoder bCryptPasswordEncoder() {
-		return new BCryptPasswordEncoder();
-	}
+  @Bean
+  public BCryptPasswordEncoder bCryptPasswordEncoder() {
+    return new BCryptPasswordEncoder();
+  }
 
 }
