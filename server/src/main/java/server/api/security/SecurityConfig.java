@@ -32,10 +32,10 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         String SIGN_UP_URL = "/users";
         String PASSWORD_RESET = "/users/resetpassword/**";
 
+
         http.csrf().disable().cors().and()
                 .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS).and()
-                .authorizeRequests().antMatchers(HttpMethod.POST, SIGN_UP_URL, SIGN_IN_URL, PASSWORD_RESET).permitAll()
-                .antMatchers(HttpMethod.GET, PASSWORD_RESET).permitAll()
+                .authorizeRequests().antMatchers(SIGN_UP_URL, SIGN_IN_URL, PASSWORD_RESET, "/ws/**").permitAll()
                 .anyRequest().authenticated().and()
                 .apply(new JWTConfigurer(jwtUtils));
     }

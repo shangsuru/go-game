@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import history from '../history';
-import api from '../api';
-import socketIOClient from 'socket.io-client';
+import React, { useState, useEffect } from "react";
+import history from "../history";
+import api from "../api";
+import Stomp from "stompjs";
+import SockJS from "sockjs-client";
 import {
   Button,
   Col,
@@ -10,8 +11,8 @@ import {
   Radio,
   Row,
   Slider,
-  Input,
-} from 'antd';
+  Input
+} from "antd";
 import {
   ClockCircleOutlined,
   DingdingOutlined,
@@ -20,278 +21,259 @@ import {
   SettingOutlined,
   TrophyOutlined,
   UpCircleOutlined,
-  UserOutlined,
-} from '@ant-design/icons';
-import { Link } from 'react-router-dom';
+  UserOutlined
+} from "@ant-design/icons";
+import { Link } from "react-router-dom";
 
-let socket;
+let stompClient = undefined;
 
 const Main = () => {
-  const [username, setUsername] = useState(''); // Username of the user logged in
-  const [userId, setUserId] = useState(''); // Id of user logged in
-  const [ownRating, setOwnRating] = useState(''); // Rating of the user logged in
+  const [username, setUsername] = useState(""); // Username of the user logged in
+  const [userId, setUserId] = useState(""); // Id of user logged in
+  const [ownRating, setOwnRating] = useState(""); // Rating of the user logged in
   const [modalVisible, setModalVisible] = useState(false); // Visibility of the modal to create a game
   const [selectedBoardSize, setSelectedBoardSize] = useState(9); // 9x9, 13x13, 19x19
   const [selectedTime, setSelectedTime] = useState(5); // Time limit for each player between 5 - 40 min
   const [selectedIncrement, setSelectedIncrement] = useState(0); // Increment for each move between 0 - 40s
-  const [selectedGameMode, setSelectedGameMode] = useState('casual'); // rated or casual games
+  const [selectedGameMode, setSelectedGameMode] = useState("casual"); // rated or casual games
   const [challenges, setChallenges] = useState([]); // Objects with name, id, rating, size, time, increment, mode
-  const [authToken, setAuthToken] = useState('');
+  const [authToken, setAuthToken] = useState("");
   const [searchHidden, setSearchHidden] = useState(true);
-  const [searchText, setSearchText] = useState('');
+  const [searchText, setSearchText] = useState("");
 
   useEffect(() => {
-    const token = localStorage.getItem('jwt');
+    const token = localStorage.getItem("jwt");
     setAuthToken(token);
 
     // Redirect to login page if user is without token
     if (token === null) {
-      history.push('/login');
+      history.push("/login");
     }
     // Make a request for profile information
     api
-      .get('users/me', {
+      .get("users/me", {
         headers: {
-          Authorization: 'Bearer ' + token,
-        },
+          Authorization: "Bearer " + token
+        }
       })
-      .then((res) => {
-        const {id, username, ratings} = res.data
+      .then(res => {
+        const { id, username, ratings } = res.data;
         setUserId(id);
         setUsername(username);
         setOwnRating(ratings[0].rating);
 
-        localStorage.setItem('username', username);
-        socket = socketIOClient('http://localhost:8000');
+        localStorage.setItem("username", username);
 
-        // Submit username to server
-        socket.emit('online', username);
-        socket.on('challenges', (data) => {
-          // Receive open challenges
-          setChallenges(data);
+        // Setup STOMP client for messaging
+        let socket = new SockJS("http://localhost:8080/ws");
+        stompClient = Stomp.over(socket);
+        stompClient.connect({}, () => {
+          // Get list of current challenges
+          stompClient.subscribe("/topic/challenges", frame => {
+            setChallenges(JSON.parse(frame.body));
+          });
+
+          // Get notified when someone accepts challenge
+          stompClient.subscribe(`/topic/acceptChallenge/${username}`, frame => {
+            let challenge = JSON.parse(frame.body);
+            alert(`${challenge.opponent} has accepted your challenge`);
+            history.push(
+              `/game?player1=${challenge.creator}&player2=${challenge.opponent}`
+            );
+          });
+          stompClient.send("/app/connect");
         });
-        // Get Notified that challenge got accepted
-        socket.on('acceptChallenge', (data) => {
-          // If the accepted challenge was the current user's challenge
-          if (data.createdChallenge === username) {
-            alert(data.acceptedChallenge + ' has accepted your challenge!');
-          }
-          // Redirect to game page
-          history.push(
-            `/game?player1=${data.createdChallenge}&player2=${data.acceptedChallenge}`
-          );
+
+        // Delete own open challenge before leaving the site
+        window.addEventListener("beforeunload", event => {
+          event.preventDefault();
+          stompClient.send("/app/deleteChallenge", {}, username);
         });
       })
-      .catch((e) => {
+      .catch(e => {
         console.log(e);
-        history.push('/login');
+        history.push("/login");
       });
   }, []);
 
   const handleLogout = () => {
-    // Delete all open challenges
-    socket.emit('logout');
-
     // Delete token in local storage and redirect to login
-    localStorage.removeItem('jwt');
-    localStorage.removeItem('username');
-    history.push('/login');
+    localStorage.removeItem("jwt");
+    localStorage.removeItem("username");
+    history.push("/login");
   };
 
-  const showModal = (e) => {
+  const showModal = e => {
     e.preventDefault();
     setModalVisible(true);
   };
 
-  const handleModalOk = (e) => {
+  const handleModalOk = e => {
     setModalVisible(false);
     let challenge = {
-      name: username,
+      creator: username,
       id: userId,
       rating: ownRating,
-      size: selectedBoardSize,
-      time: selectedTime,
-      increment: selectedIncrement,
-      mode: selectedGameMode,
+      boardSize: selectedBoardSize,
+      duration: selectedTime,
+      timeIncrement: selectedIncrement,
+      mode: selectedGameMode
     };
 
-    // Delete old created challenge if there is any
-    let filteredChallenges = challenges.filter(
-      (challenge) => challenge.name !== username
-    );
-
-    // Send new challenge to server
-    setChallenges([...filteredChallenges, challenge]);
-    socket.emit('updateChallenges', [...filteredChallenges, challenge]);
+    stompClient.send("/app/addChallenge", {}, JSON.stringify(challenge));
   };
 
-  const handleModalCancel = (e) => {
+  const handleModalCancel = e => {
     setModalVisible(false);
   };
 
-  const handleBoardSizeSelect = (e) => {
+  const handleBoardSizeSelect = e => {
     setSelectedBoardSize(e.target.value);
   };
 
-  const handleTimeSlider = (value) => {
+  const handleTimeSlider = value => {
     setSelectedTime(value);
   };
 
-  const handleIncrementSlider = (value) => {
+  const handleIncrementSlider = value => {
     setSelectedIncrement(value);
   };
 
-  const handleGameModeChange = (e) => {
+  const handleGameModeChange = e => {
     setSelectedGameMode(e.target.value);
   };
 
-  const handleChallengeClick = async (
-    name,
-    id,
-    rating,
-    size,
-    time,
-    increment,
-    mode
-  ) => {
-    // Remove clicked challenge from state and update server
-    let filteredChallenges = challenges.filter(
-      (challenge) => challenge.name !== name
-    );
-    setChallenges(filteredChallenges);
-    socket.emit('updateChallenges', filteredChallenges);
+  const handleChallengeClick = async challenge => {
+    stompClient.send("/app/deleteChallenge", {}, challenge.creator);
 
-    // If clicked by a user who did not create the challenge
-    if (username !== name) {
-      socket.emit('acceptChallenge', {
-        createdChallenge: name,
-        acceptedChallenge: username,
-      });
+    if (username !== challenge.creator) {
+      // If user is not the creator of the challenge
+      challenge["opponent"] = username; // Set user as opponent for the challenge
+      stompClient.send(
+        `/app/acceptChallenge/${challenge.creator}`,
+        {},
+        JSON.stringify(challenge)
+      );
 
       // Save game to the database
       await api.post(
-        '/games',
+        "/games",
         {
-          player1: name,
+          player1: challenge.creator,
           player2: username,
-          time: time,
-          timeIncrement: increment,
-          size: size,
-          rated: mode === 'rated',
-          oldRatingPlayer1: rating,
+          time: challenge.duration,
+          timeIncrement: challenge.timeIncrement,
+          size: challenge.boardSize,
+          rated: challenge.mode === "rated",
+          oldRatingPlayer1: challenge.rating,
           oldRatingPlayer2: ownRating,
-          timestamp: new Date(),
+          timestamp: new Date()
         },
         {
           headers: {
-            Authorization: 'Bearer ' + authToken,
-          },
+            Authorization: "Bearer " + authToken
+          }
         }
       );
 
       // Redirect to game page
-      history.push(`/game?player1=${name}&player2=${username}`);
+      history.push(
+        `/game?player1=${challenge.creator}&player2=${challenge.opponent}`
+      );
     }
   };
 
   if (!username) {
-    return <div className='main'></div>;
+    return <div className="main"></div>;
   }
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
+  const handleKeyPress = e => {
+    if (e.key === "Enter") {
       history.push(`/profile/${searchText}`);
     }
   };
 
   return (
-    <div className='main'>
-      <div id='menu'>
-        <span className='profile__searchicon'>
+    <div className="main">
+      <div id="menu">
+        <span className="profile__searchicon">
           <SearchOutlined onClick={() => setSearchHidden(!searchHidden)} />
         </span>
         {searchHidden ? null : (
           <Input
-            placeholder='Search'
-            className='profile__searchfield'
+            placeholder="Search"
+            className="profile__searchfield"
             value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            onKeyPress={(e) => handleKeyPress(e)}
+            onChange={e => setSearchText(e.target.value)}
+            onKeyPress={e => handleKeyPress(e)}
           />
         )}
         <Link to={{ pathname: `/profile/${username}` }}>
-          <span className='menu__item'>
+          <span className="menu__item">
             <UserOutlined /> {username}
           </span>
         </Link>
-        <Link to='/settings'>
-          <span className='menu__item'>
+        <Link to="/settings">
+          <span className="menu__item">
             <SettingOutlined /> Settings
           </span>
         </Link>
-        <span className='menu__item' onClick={handleLogout}>
+        <span className="menu__item" onClick={handleLogout}>
           <PoweroffOutlined /> Sign out
         </span>
       </div>
 
-      <div id='challenge__box'>
-        {challenges.map(({ name, id, rating, size, time, increment, mode }) => (
+      <div id="challenge__box">
+        {challenges.map(challenge => (
           <div
-            className='challenge__items'
-            onClick={() =>
-              handleChallengeClick(
-                name,
-                id,
-                rating,
-                size,
-                time,
-                increment,
-                mode
-              )
-            }
+            className="challenge__items"
+            key={challenge.id}
+            onClick={() => handleChallengeClick(challenge)}
           >
-            <Row justify='space-around'>
-              <Col>{name}</Col>
+            <Row justify="space-around">
+              <Col>{challenge.creator}</Col>
               <Col>
-                <TrophyOutlined /> {rating}
+                <TrophyOutlined /> {challenge.rating}
               </Col>
               <Col>
-                <UpCircleOutlined /> {size}x{size}
+                <UpCircleOutlined /> {challenge.boardSize}x{challenge.boardSize}
               </Col>
               <Col>
-                <ClockCircleOutlined /> {time}+{increment}
+                <ClockCircleOutlined /> {challenge.duration}+
+                {challenge.timeIncrement}
               </Col>
               <Col>
-                <DingdingOutlined /> {mode}
+                <DingdingOutlined /> {challenge.mode}
               </Col>
             </Row>
           </div>
         ))}
-        <div className='button'>
+
+        <div className="button">
           <Button
-            type='primary'
+            type="primary"
             style={{
-              textTransform: 'uppercase',
-              marginTop: '15px',
+              textTransform: "uppercase",
+              marginTop: "15px"
             }}
             onClick={showModal}
           >
             Create a game
           </Button>
           <Modal
-            title='Create a game'
+            title="Create a game"
             visible={modalVisible}
             onOk={handleModalOk}
             onCancel={handleModalCancel}
           >
-            <Row gutter={[0, 20]} justify='space-around'>
+            <Row gutter={[0, 20]} justify="space-around">
               <Col span={4}>Time Limit</Col>
               <Col span={8}>
                 <Slider
                   min={5}
                   max={40}
                   onChange={handleTimeSlider}
-                  value={typeof selectedTime === 'number' ? selectedTime : 5}
+                  value={typeof selectedTime === "number" ? selectedTime : 5}
                 />
               </Col>
               <Col span={4}>
@@ -304,7 +286,7 @@ const Main = () => {
                 />
               </Col>
             </Row>
-            <Row gutter={[0, 20]} justify='space-around'>
+            <Row gutter={[0, 20]} justify="space-around">
               <Col span={4}>Increment</Col>
               <Col span={8}>
                 <Slider
@@ -312,7 +294,7 @@ const Main = () => {
                   max={40}
                   onChange={handleIncrementSlider}
                   value={
-                    typeof selectedIncrement === 'number'
+                    typeof selectedIncrement === "number"
                       ? selectedIncrement
                       : 0
                   }
@@ -328,7 +310,7 @@ const Main = () => {
                 />
               </Col>
             </Row>
-            <Row gutter={[0, 20]} justify='space-around'>
+            <Row gutter={[0, 20]} justify="space-around">
               <Col>
                 <Radio.Group
                   value={selectedBoardSize}
@@ -340,14 +322,14 @@ const Main = () => {
                 </Radio.Group>
               </Col>
             </Row>
-            <Row gutter={[0, 20]} justify='space-around'>
+            <Row gutter={[0, 20]} justify="space-around">
               <Col>
                 <Radio.Group
                   value={selectedGameMode}
                   onChange={handleGameModeChange}
                 >
-                  <Radio.Button value='casual'>Casual</Radio.Button>
-                  <Radio.Button value='rated'>Rated</Radio.Button>
+                  <Radio.Button value="casual">Casual</Radio.Button>
+                  <Radio.Button value="rated">Rated</Radio.Button>
                 </Radio.Group>
               </Col>
             </Row>

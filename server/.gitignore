@@ -10,3 +10,4 @@
 *.ipr
 
 /target/
+/src/main/resources/META-INF/
