@@ -25,8 +25,6 @@ import {
 } from "@ant-design/icons";
 import { Link } from "react-router-dom";
 
-let stompClient = undefined;
-
 const Main = () => {
   const [username, setUsername] = useState(""); // Username of the user logged in
   const [userId, setUserId] = useState(""); // Id of user logged in
@@ -40,6 +38,9 @@ const Main = () => {
   const [authToken, setAuthToken] = useState("");
   const [searchHidden, setSearchHidden] = useState(true);
   const [searchText, setSearchText] = useState("");
+  const [socket, setSocket] = useState(
+    Stomp.over(new SockJS("http://localhost:8080/ws"))
+  );
 
   useEffect(() => {
     const token = localStorage.getItem("jwt");
@@ -65,29 +66,26 @@ const Main = () => {
         localStorage.setItem("username", username);
 
         // Setup STOMP client for messaging
-        let socket = new SockJS("http://localhost:8080/ws");
-        stompClient = Stomp.over(socket);
-        stompClient.connect({}, () => {
+        socket.connect({}, () => {
           // Get list of current challenges
-          stompClient.subscribe("/topic/challenges", frame => {
+          socket.subscribe("/topic/challenges", frame => {
             setChallenges(JSON.parse(frame.body));
           });
 
           // Get notified when someone accepts challenge
-          stompClient.subscribe(`/topic/acceptChallenge/${username}`, frame => {
+          socket.subscribe(`/topic/acceptChallenge/${username}`, frame => {
             let challenge = JSON.parse(frame.body);
             alert(`${challenge.opponent} has accepted your challenge`);
             history.push(
               `/game?player1=${challenge.creator}&player2=${challenge.opponent}`
             );
           });
-          stompClient.send("/app/connect");
+          socket.send("/app/connect");
         });
 
         // Delete own open challenge before leaving the site
-        window.addEventListener("beforeunload", event => {
-          event.preventDefault();
-          stompClient.send("/app/deleteChallenge", {}, username);
+        window.addEventListener("beforeunload", () => {
+          socket.send("/app/deleteChallenge", {}, username);
         });
       })
       .catch(e => {
@@ -120,7 +118,7 @@ const Main = () => {
       mode: selectedGameMode
     };
 
-    stompClient.send("/app/addChallenge", {}, JSON.stringify(challenge));
+    socket.send("/app/addChallenge", {}, JSON.stringify(challenge));
   };
 
   const handleModalCancel = e => {
@@ -144,12 +142,12 @@ const Main = () => {
   };
 
   const handleChallengeClick = async challenge => {
-    stompClient.send("/app/deleteChallenge", {}, challenge.creator);
+    socket.send("/app/deleteChallenge", {}, challenge.creator);
 
     if (username !== challenge.creator) {
       // If user is not the creator of the challenge
       challenge["opponent"] = username; // Set user as opponent for the challenge
-      stompClient.send(
+      socket.send(
         `/app/acceptChallenge/${challenge.creator}`,
         {},
         JSON.stringify(challenge)

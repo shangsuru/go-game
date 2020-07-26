@@ -11,7 +11,7 @@ import { Prompt } from "react-router";
 import Stomp from "stompjs";
 import SockJS from "sockjs-client";
 
-const msgType = {
+const gameMessage = {
   MOVE: "MOVE",
   PASS: "PASS",
   FORFEIT: "FORFEIT",
@@ -20,23 +20,8 @@ const msgType = {
   NULL: "NULL"
 };
 
-const INFOBOXSYMBOLRATIO = 6;
+const INFOBOX_SYMBOL_RATIO = 6;
 
-/**
- * this.g                   - game object to call methods of BoardComponent.Game
- * this.game                - game object for rendering the game
- * this.state.canvasSize    - size of rendered board in pixel
- * this.state.currentPlayer - current Player
- * this.state.prevData      - previous transmitted move data
- * this.socket              - socket
- * this.decoded             - JSONWebToken
- * this.roomName            - roomName for Game Communication
- * this.p1                  - BoardComponents.Player instance of Player 1
- * this.p2                  - BoardComponents.Player instance of Player 2
- * this.username               - username of own Player
- * this.ownPlayer           -
- *
- */
 class GameWindow extends React.Component {
   constructor(props) {
     super(props);
@@ -54,8 +39,6 @@ class GameWindow extends React.Component {
       rated: false,
 
       boardToScreenRatio: 0.85,
-      chatbuffer: [],
-      stringbuffer: "",
       canvasSize: 300,
       showEndWindow: false,
       playersConnected: false,
@@ -81,13 +64,16 @@ class GameWindow extends React.Component {
     this.player1 = urlParams.get("player1");
     this.player2 = urlParams.get("player2");
 
-    // Set up communication between the two players exclusively
-    let socket = new SockJS("http://localhost:8080/ws");
-    this.stompClient = Stomp.over(socket);
-    this.stompClient.connect({}, () => {
-      this.stompClient.subscribe(
+    // Set up communication between the two players
+    this.socket = Stomp.over(new SockJS("http://localhost:8080/ws"));
+    await this.socket.connect({}, () => {
+      this.socket.subscribe(
         `/topic/system/${this.player1}/${this.player2}`,
         frame => this.onSystemMessage(frame.body)
+      );
+      this.socket.subscribe(
+        `/topic/game/${this.player1}/${this.player2}`,
+        frame => this.onGameCommunication(JSON.parse(frame.body))
       );
     });
 
@@ -128,9 +114,6 @@ class GameWindow extends React.Component {
     );
 
     window.addEventListener("resize", this.onResize);
-
-    //this.socket.on("game", this.onGameComm); // TODO
-
     this.init(this.gameData, user1, user2);
   }
 
@@ -156,9 +139,7 @@ class GameWindow extends React.Component {
 
     this.username = localStorage.getItem("username");
 
-    //this.socket.emit("online", this.username); // TODO
-
-    this.stompClient.send(
+    this.socket.send(
       `/app/joinGame/${this.player1}/${this.player2}`,
       {},
       this.username
@@ -193,31 +174,29 @@ class GameWindow extends React.Component {
     });
   }
 
-  /**
-   * #### methods handeling communications ####
-   */
-
   onSystemMessage = message => {
-    console.log("++++++++++++++++++++++++++++++", message);
-    console.log(typeof message);
-    console.log(message[0]);
     if (message === "DISCONNECTED") {
-      /*this.socket.emit("chat", {
-        data: { user: "System", msg: `${msg.user} has disconnected.` },
-        room: this.roomName
-      });*/
-      // TODO
-      //this.onDisconnect(msg.user);
+      this.socket.send(
+        `/app/chat/${this.player1}/${this.player2}`,
+        {},
+        JSON.stringify({
+          user: "System",
+          text: `${message.user} has disconnected.`
+        })
+      );
+
+      this.onDisconnect(message.user);
     } else if (message === "JOINED") {
-      // this.socket.emit('chat', { data: { user: 'System', msg: `${msg.user} has joined the room.` }, room: this.roomName });
+      this.socket.send(
+        `/app/chat/${this.player1}/${this.player2}`,
+        {},
+        JSON.stringify({ user: "System", text: `${message.user} has joined.` })
+      );
     } else if (message === "CONNECTION_ESTABLISHED") {
       this.setState({ playersConnected: true });
     }
   };
 
-  /**
-   * @param {User} user - disconnected user
-   */
   onDisconnect = user => {
     if (this.state.gameEnd) return;
     if (user === this.p1.props.name) this.gameHasEnded(this.state, this.p2);
@@ -225,20 +204,17 @@ class GameWindow extends React.Component {
       this.gameHasEnded(this.state, this.p1);
   };
 
-  /**
-   * Game Communication Handler(See Documentation)
-   */
-  onGameComm = msg => {
+  onGameCommunication = msg => {
     if (msg.sender === this.username) return;
-    if (msg.type === msgType.MOVE) {
+    if (msg.type === gameMessage.MOVE) {
       this.processInput(msg.x, msg.y, msg.sender);
-    } else if (msg.type === msgType.PASS) {
+    } else if (msg.type === gameMessage.PASS) {
       this.pass(msg.sender);
-    } else if (msg.type === msgType.FORFEIT) {
+    } else if (msg.type === gameMessage.FORFEIT) {
       let winner = msg.sender === this.p1.props.name ? this.p2 : this.p1;
       this.gameHasEnded(this.state, winner);
     } else if (
-      msg.type === msgType.RESULT &&
+      msg.type === gameMessage.RESULT &&
       this.state.gameEnd &&
       this.state.waitingForResult
     ) {
@@ -259,53 +235,38 @@ class GameWindow extends React.Component {
     );
   };
 
-  /**
-   *
-   * @param {Number} x - Integer number of x coordinate of move
-   * @param {Number} y - Integer number of y coordinate of move
-   */
   broadcastMove = (x, y) => {
-    let data = {
-      message: { type: msgType.MOVE, x: x, y: y, sender: this.username },
-      room: this.roomName
+    let message = {
+      type: gameMessage.MOVE,
+      sender: this.username,
+      x: x,
+      y: y
     };
 
-    /*this.socket.emit("game", data);*/ // TODO
+    this.socket.send(
+      `/app/game/${this.player1}/${this.player2}`,
+      {},
+      JSON.stringify(message)
+    );
   };
 
-  /**
-   * passes the move
-   */
   broadcastPass = () => {
-    /*this.socket.emit("game", {
-      message: { type: msgType.PASS, sender: this.username, player: this.ownPlayer },
-      room: this.roomName
-    });
-    this.socket.emit("chat", {
-      data: {
-        user: "Game",
-        msg: `${this.username} has passed.(Round ${this.state.round})`
-      },
-      room: this.roomName
-    });*/
-    // TODO
-  };
+    let passMessage = { type: gameMessage.PASS, sender: this.username };
+    let chatNotification = {
+      user: "Game",
+      text: `${this.username} has passed. (Round ${this.state.round}`
+    };
 
-  /**
-   * error handler for child components
-   */
-  err = state => {
-    alert("An Error occured on Child component");
-    console.log(state);
-  };
-
-  /**
-   * methods manipulating / using GameStates
-   */
-
-  setImmediateWin = player => {
-    this.setState({ winner: player, gameEnd: true });
-    this.onEnd(player);
+    this.socket.send(
+      `/app/game/${this.player1}/${this.player2}`,
+      {},
+      JSON.stringify(passMessage)
+    );
+    this.socket.send(
+      `/app/chat/${this.player1}/${this.player2}`,
+      {},
+      JSON.stringify(chatNotification)
+    );
   };
 
   processInput = (x, y, player) => {
@@ -359,9 +320,6 @@ class GameWindow extends React.Component {
     this.updateGame(newState);
   };
 
-  /**
-   * update game state when move is made
-   */
   onNextMove = fields => {
     const history = this.state.history.slice(0, this.state.round + 1);
 
@@ -390,33 +348,29 @@ class GameWindow extends React.Component {
   }
 
   onForfeit = () => {
+    // TODO
     if (!this.ownPlayer || this.state.gameEnd) return;
     this.gameHasEnded(
       this.state,
       this.ownPlayer === this.p1 ? this.p2 : this.p1
     );
-    /*this.socket.emit("game", {
-      message: { type: msgType.FORFEIT, sender: this.ownPlayer.props.name },
-      room: this.roomName
-    });*/ // TODO
+    let message = { type: gameMessage.FORFEIT, sender: this.username };
+    this.socket.send(
+      `/app/game/${this.player1}/${this.player2}`,
+      {},
+      JSON.stringify(message)
+    );
   };
 
-  /**
-   * updates game accordingly to new game state(terminates game if passCount >= 2), automatically passes if there are no moves to be made for current player
-   * @param {GameState} newState - new game state
-   */
+  //Updates game accordingly to new game state(terminates game if passCount >= 2), automatically passes if there are no moves to be made for current player
   updateGame(newState) {
     this.setState(newState);
 
     if (newState.history[newState.round].passCount >= 2) {
-      // game Ended
       this.gameHasEnded(newState);
     }
   }
 
-  /**
-   * method called when game has ended
-   */
   gameHasEnded = (newState, player) => {
     let whoIsWinning = null;
     let newGameState = newState.history[newState.round].gameState;
@@ -441,7 +395,7 @@ class GameWindow extends React.Component {
 
     api
       .patch(
-        `/games/${this.gameData.data._id}`,
+        `/games/${this.gameData.data.id}`,
         { player1Won: whoIsWinning === this.p1 },
         {
           headers: {
@@ -450,10 +404,12 @@ class GameWindow extends React.Component {
         }
       )
       .then(res => {
-        /*this.socket.emit("game", {
-          message: { type: msgType.RESULT, data: res.data },
-          room: this.roomName
-        });*/ // TODO
+        let resultMessage = { type: gameMessage.RESULT, game: res.data };
+        this.socket.send(
+          `app/game/${this.player1}/${this.player2}`,
+          {},
+          JSON.stringify(resultMessage)
+        );
         this.onResult(res.data);
       })
       .catch(e => {
@@ -461,9 +417,6 @@ class GameWindow extends React.Component {
       });
   };
 
-  /**
-   * Renders a image of flag of given country (default US)
-   */
   renderFlag = country => {
     let altText, countryID;
     switch (country) {
@@ -502,16 +455,13 @@ class GameWindow extends React.Component {
     );
   };
 
-  /**
-   * displays player information
-   */
   playerInfo = player => {
     if (!player) return null;
     let playerColor = player.props.playerColor;
     return (
       <div className="infobox">
         <Row type="flex" className="infoboxrow">
-          <Col span={INFOBOXSYMBOLRATIO}>
+          <Col span={INFOBOX_SYMBOL_RATIO}>
             <div className="infoboxiconcontainer">
               <div
                 style={{
@@ -527,7 +477,7 @@ class GameWindow extends React.Component {
           <Col>{player.props.name ? player.props.name : "Undefined"}</Col>
         </Row>
         <Row type="flex" className="infoboxrow">
-          <Col span={INFOBOXSYMBOLRATIO}>
+          <Col span={INFOBOX_SYMBOL_RATIO}>
             <div className="infoboxiconcontainer">
               {player.props.data.country ? (
                 <div style={{ height: "min-content", width: "min-content" }}>
@@ -549,7 +499,7 @@ class GameWindow extends React.Component {
           </Col>
         </Row>
         <Row type="flex" className="infoboxrow">
-          <Col span={INFOBOXSYMBOLRATIO} className="infoboxiconcontainer">
+          <Col span={INFOBOX_SYMBOL_RATIO} className="infoboxiconcontainer">
             <div className="infoboxicon">
               <img
                 src={process.env.PUBLIC_URL + "/rank_sym.png"}
@@ -566,7 +516,7 @@ class GameWindow extends React.Component {
           </Col>
         </Row>
         <Row type="flex" className="infoboxrow">
-          <Col span={INFOBOXSYMBOLRATIO} className="infoboxiconcontainer">
+          <Col span={INFOBOX_SYMBOL_RATIO} className="infoboxiconcontainer">
             <div className="infoboxicon">
               <img
                 src={process.env.PUBLIC_URL + "/time_icon.png"}
@@ -591,9 +541,6 @@ class GameWindow extends React.Component {
     );
   };
 
-  /**
-   * calculates optimal canvas size depending on window size
-   */
   getNewCanvasSize = () => {
     let smallerAxis =
       window.innerWidth > window.innerHeight
@@ -611,9 +558,6 @@ class GameWindow extends React.Component {
       : 400;
   };
 
-  /**
-   * renders the content view(the board and the info / chat)
-   */
   renderContentView = () => {
     return (
       <div>
@@ -648,7 +592,7 @@ class GameWindow extends React.Component {
               {this.displayInfo()}
               <Chat
                 user={this.username}
-                socket={this.stompClient}
+                socket={this.socket}
                 player1={this.player1}
                 player2={this.player2}
                 customButtons={
@@ -675,11 +619,6 @@ class GameWindow extends React.Component {
   }
 
   gameEnded = () => {
-    let player1gainloss =
-      this.newRatingPlayer1 - this.gameData.data.oldRatingPlayer1;
-    let player2gainloss =
-      this.newRatingPlayer2 - this.gameData.data.oldRatingPlayer2;
-
     if (this.state.showEndWindow)
       return (
         <div
@@ -761,17 +700,12 @@ class GameWindow extends React.Component {
       );
   };
 
-  /**
-   * resize handler
-   */
   onResize = () => {
     let newSize = this.getNewCanvasSize();
     this.setState({ canvasSize: newSize });
   };
 
-  /**
-   * Player and current game information
-   */
+  //Player and current game information
   displayInfo = () => {
     return (
       <div
@@ -787,16 +721,6 @@ class GameWindow extends React.Component {
     );
   };
 
-  increaseBoardRatio = () => {
-    if (this.state.boardToScreenRatio >= 0.9) return;
-    this.setState({ boardToScreenRatio: this.state.boardToScreenRatio - 0.1 });
-  };
-
-  decreaseBoardRatio = () => {
-    if (this.state.boardToScreenRatio <= 0.3) return;
-    this.setState({ boardToScreenRatio: this.state.boardToScreenRatio - 0.1 });
-  };
-
   /**
    * equals function for arrays
    */
@@ -804,16 +728,16 @@ class GameWindow extends React.Component {
     // if the other array is a falsy value, return
     if (!array2) return false;
 
-    // compare lengths - can save a lot of time
+    // Compare lengths - can save a lot of time
     if (array1.length !== array2.length) return false;
 
-    for (var i = 0, l = array1.length; i < l; i++) {
+    for (let i = 0, l = array1.length; i < l; i++) {
       // Check if we have nested arrays
       if (array1[i] instanceof Array && array2[i] instanceof Array) {
-        // recurse into the nested arrays
+        // Recurse into the nested arrays
         if (!array1[i].equals(array2[i])) return false;
       } else if (array1[i] !== array2[i]) {
-        // Warning - two different object instances will never be equal: {x:20} != {x:20}
+        // Two different object instances will never be equal: {x:20} != {x:20}
         return false;
       }
     }
@@ -821,7 +745,7 @@ class GameWindow extends React.Component {
   };
 
   render() {
-    if (this.state.loading) return null; //TODO
+    if (this.state.loading) return null;
     if (!this.state.playersConnected)
       return <div>Waiting for players to be connected...</div>;
     return (
