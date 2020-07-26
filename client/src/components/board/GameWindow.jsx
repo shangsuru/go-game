@@ -211,7 +211,7 @@ class GameWindow extends React.Component {
     } else if (msg.type === gameMessage.PASS) {
       this.pass(msg.sender);
     } else if (msg.type === gameMessage.FORFEIT) {
-      let winner = msg.sender === this.p1.props.name ? this.p2 : this.p1;
+      let winner = msg.sender === this.p1.props.name ? this.p2 : this.p1; // TODO
       this.gameHasEnded(this.state, winner);
     } else if (
       msg.type === gameMessage.RESULT &&
@@ -348,7 +348,6 @@ class GameWindow extends React.Component {
   }
 
   onForfeit = () => {
-    // TODO
     if (!this.ownPlayer || this.state.gameEnd) return;
     this.gameHasEnded(
       this.state,
@@ -377,13 +376,14 @@ class GameWindow extends React.Component {
     if (
       newGameState.points[this.p1.props.name] >
       newGameState.points[this.p2.props.name]
-    )
+    ) {
       whoIsWinning = this.p1;
-    else if (
+    } else if (
       newGameState.points[this.p1.props.name] <
       newGameState.points[this.p2.props.name]
-    )
+    ) {
       whoIsWinning = this.p2;
+    }
 
     whoIsWinning = !player ? whoIsWinning : player;
     this.setState({ gameEnd: true, winner: whoIsWinning });

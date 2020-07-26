@@ -1,8 +1,13 @@
-@import '~antd/dist/antd.dark.css';
+@import "~antd/dist/antd.dark.css";
+
+::-webkit-scrollbar {
+  width: 0px;
+  background: transparent; /* make scrollbar transparent */
+}
 
 body {
   background-color: #121212;
-  font-family: 'Noto Sans', sans-serif;
+  font-family: "Noto Sans", sans-serif;
 }
 
 h1,
@@ -11,7 +16,7 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: 'Roboto', sans-serif;
+  font-family: "Roboto", sans-serif;
 }
 
 .entry {
@@ -97,6 +102,7 @@ h6 {
   width: 50%;
   height: 60%;
   overflow: scroll;
+  scrollbar-width: none;  /* Firefox */
 }
 
 .challenge__items {
@@ -360,7 +366,17 @@ h6 {
   align-content: center;
 }
 
-.chatInput {
+.chatbox {
+  display: flex;
+  flex-grow: 1;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  border-radius: 10px;
+  height: 100%;
+}
+
+.chatbox__input {
   display: block;
   background-color: #f0f0f0;
   flex-grow: 1;
@@ -376,11 +392,31 @@ h6 {
   overflow: auto;
 }
 
-.chatInput:focus {
+.chatbox__input:focus {
   outline: none;
 }
 
-.chatboxbutton {
+.chatbox__messagelist {
+  background-color: #433E3C;
+  height: 240px;
+  width: 100%;
+  margin-bottom: 0;
+  font-size: 15px;
+  color: white;
+  padding: 12px;
+  overflow: scroll;
+  scrollbar-width: none;  /* Firefox */
+}
+
+.chatbox__panel {
+  display: flex;
+  background-color: grey;
+  height: 15%;
+  width: 100%;
+  padding: 5px;
+}
+
+.chatbox__button {
   width: auto;
   margin: 2.5px;
   margin-top: 0;

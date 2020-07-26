@@ -69,11 +69,11 @@ public class GameController {
     int ratingPlayer2 = game.getOldRatingPlayer2();
     if (game.isRated()) {
       if (player1Won) {
-        ratingPlayer1 += getRatingChange(ratingPlayer1, ratingPlayer2);
-        ratingPlayer2 -= getRatingChange(ratingPlayer1, ratingPlayer2);
+        ratingPlayer1 = Math.max(0, ratingPlayer1 + getRatingChange(ratingPlayer1, ratingPlayer2));
+        ratingPlayer2 = Math.max(0, ratingPlayer2 - getRatingChange(ratingPlayer1, ratingPlayer2));
       } else {
-        ratingPlayer1 -= getRatingChange(ratingPlayer2, ratingPlayer1);
-        ratingPlayer2 += getRatingChange(ratingPlayer2, ratingPlayer1);
+        ratingPlayer1 = Math.max(0, ratingPlayer1 - getRatingChange(ratingPlayer2, ratingPlayer1));
+        ratingPlayer2 = Math.max(0, ratingPlayer2 + getRatingChange(ratingPlayer2, ratingPlayer1));
       }
     }
 
@@ -86,6 +86,6 @@ public class GameController {
   }
 
   private int getRatingChange(int winnerRating, int loserRating) {
-    return Math.max(0, 5 + 15 * Math.min(loserRating / (winnerRating + 1), 1));
+    return 5 + 15 * Math.min(loserRating / (winnerRating + 1), 1);
   }
 }

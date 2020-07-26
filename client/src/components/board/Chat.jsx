@@ -52,47 +52,19 @@ const Chat = ({ user, socket, player1, player2, customButtons }) => {
         minHeight: "300px",
         height: "fit-content",
         overflow: "hidden",
+        scrollbarWidth: "none" /* Firefox */,
         padding: "20px"
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          flexGrow: 1,
-          flexDirection: "column",
-          alignItems: "center",
-          width: "100%",
-          borderRadius: "10px",
-          height: "100%"
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: "#433E3C",
-            height: "240px",
-            width: "100%",
-            marginBottom: "0",
-            fontSize: "15px",
-            color: "white",
-            padding: "12px",
-            overflow: "scroll"
-          }}
-        >
+      <div class="chatbox">
+        <div class="chatbox__messagelist">
           {chat.map(message => {
             return displayMessage(message);
           })}
         </div>
-        <div
-          style={{
-            display: "flex",
-            backgroundColor: "grey",
-            height: "15%",
-            width: "100%",
-            padding: "5px"
-          }}
-        >
+        <div class="chatbox__panel">
           <input
-            className="chatInput"
+            className="chatbox__input"
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             onKeyPress={handleEnter}
@@ -102,7 +74,7 @@ const Chat = ({ user, socket, player1, player2, customButtons }) => {
                 return (
                   <button
                     key={customButton.label}
-                    className="chatboxbutton"
+                    className="chatbox__button"
                     style={{ backgroundColor: "#34e346" }}
                     onClick={customButton.onClick}
                   >
@@ -111,7 +83,7 @@ const Chat = ({ user, socket, player1, player2, customButtons }) => {
                 );
               })
             : null}
-          <button className="chatboxbutton" onClick={sendMessage}>
+          <button className="chatbox__button" onClick={sendMessage}>
             <div>Send</div>
           </button>
         </div>
