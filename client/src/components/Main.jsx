@@ -160,10 +160,10 @@ const Main = () => {
         "/games",
         {
           player1: challenge.creator,
-          player2: username,
+          player2: challenge.opponent,
           time: challenge.duration,
           timeIncrement: challenge.timeIncrement,
-          size: challenge.boardSize,
+          boardSize: challenge.boardSize,
           rated: challenge.mode === "rated",
           oldRatingPlayer1: challenge.rating,
           oldRatingPlayer2: ownRating,

@@ -14,6 +14,7 @@ public class Game {
   private String player1;
   private String player2;
   private boolean rated;
+  private int boardSize;
   private int time;
   private int timeIncrement;
   private int oldRatingPlayer1;
@@ -25,13 +26,14 @@ public class Game {
   @CreationTimestamp
   private Date timestamp;
 
-  public Game(String player1, String player2, boolean rated, int time,
+  public Game(String player1, String player2, boolean rated, int boardSize, int time,
               int timeIncrement, int oldRatingPlayer1,
               int newRatingPlayer1, int oldRatingPlayer2,
               int newRatingPlayer2, boolean player1Winner) {
     this.player1 = player1;
     this.player2 = player2;
     this.rated = rated;
+    this.boardSize = boardSize;
     this.time = time;
     this.timeIncrement = timeIncrement;
     this.oldRatingPlayer1 = oldRatingPlayer1;
@@ -50,6 +52,14 @@ public class Game {
 
   public Long getId() {
     return id;
+  }
+
+  public int getBoardSize() {
+    return boardSize;
+  }
+
+  public void setBoardSize(int boardSize) {
+    this.boardSize = boardSize;
   }
 
   public String getPlayer1() {

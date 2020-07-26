@@ -1,22 +1,23 @@
-import React from 'react';
-import jwt_decode from 'jwt-decode';
-import history from '../../history';
-import api from '../../api';
-import socketIOClient from 'socket.io-client';
-import { Game, Player, Board } from './BoardComponents';
-import Clock from './Clock';
-import { Row, Col, Button } from 'antd';
-import 'antd/dist/antd.css';
-import Chat from './Chat';
-import { Prompt } from 'react-router';
+import React from "react";
+import jwt_decode from "jwt-decode";
+import history from "../../history";
+import api from "../../api";
+import { Game, Player, Board } from "./BoardComponents";
+import Clock from "./Clock";
+import { Row, Col, Button } from "antd";
+import "antd/dist/antd.css";
+import Chat from "./Chat";
+import { Prompt } from "react-router";
+import Stomp from "stompjs";
+import SockJS from "sockjs-client";
 
 const msgType = {
-  MOVE: 'MOVE',
-  PASS: 'PASS',
-  FORFEIT: 'FORFEIT',
-  RESULT: 'RESULT',
-  ERR: 'ERR',
-  NULL: 'NULL',
+  MOVE: "MOVE",
+  PASS: "PASS",
+  FORFEIT: "FORFEIT",
+  RESULT: "RESULT",
+  ERR: "ERR",
+  NULL: "NULL"
 };
 
 const INFOBOXSYMBOLRATIO = 6;
@@ -32,7 +33,7 @@ const INFOBOXSYMBOLRATIO = 6;
  * this.roomName            - roomName for Game Communication
  * this.p1                  - BoardComponents.Player instance of Player 1
  * this.p2                  - BoardComponents.Player instance of Player 2
- * this.un                  - username of own Player
+ * this.username               - username of own Player
  * this.ownPlayer           -
  *
  */
@@ -54,80 +55,82 @@ class GameWindow extends React.Component {
 
       boardToScreenRatio: 0.85,
       chatbuffer: [],
-      stringbuffer: '',
+      stringbuffer: "",
       canvasSize: 300,
       showEndWindow: false,
       playersConnected: false,
-      waitingForResult: true,
+      waitingForResult: true
     };
   }
 
   async componentDidMount() {
-    this.token = localStorage.getItem('jwt');
+    this.token = localStorage.getItem("jwt");
 
     // Redirect to login page if user is without token
     if (this.token === null) {
-      history.push('/login');
+      history.push("/login");
     }
-    // Redirect to main page if user is not part of the game
-    this.decoded = jwt_decode(this.token);
 
-    if (!document.URL.includes(this.decoded.name)) {
-      history.push('/');
+    // Redirect to main page if user is not part of the game
+    if (!document.URL.includes(jwt_decode(this.token).sub)) {
+      history.push("/");
     }
 
     // Get players
     let urlParams = new URLSearchParams(window.location.search);
-    let pl1 = urlParams.get('player1');
-    let pl2 = urlParams.get('player2');
+    this.player1 = urlParams.get("player1");
+    this.player2 = urlParams.get("player2");
 
     // Set up communication between the two players exclusively
-    this.roomName = `${pl1}-${pl2}`;
-    this.socket = socketIOClient('http://localhost:8000');
+    let socket = new SockJS("http://localhost:8080/ws");
+    this.stompClient = Stomp.over(socket);
+    this.stompClient.connect({}, () => {
+      this.stompClient.subscribe(
+        `/topic/system/${this.player1}/${this.player2}`,
+        frame => this.onSystemMessage(frame.body)
+      );
+    });
 
     this.gameData = await api.get(
-      `/games/active?player1=${pl1}&player2=${pl2}`,
+      `/games/active?player1=${this.player1}&player2=${this.player2}`,
       {
         headers: {
-          Authorization: 'Bearer ' + this.token,
-        },
+          Authorization: "Bearer " + this.token
+        }
       }
     );
 
     if (this.gameData.status === 204) {
-      history.push('/');
+      history.push("/");
       return;
     }
 
     this.setState({ rated: this.gameData.data.rated });
 
-    console.log(this.gameData);
-
-    const user1 = await api.get(`users/${pl1}`, {
+    const user1 = await api.get(`users/${this.player1}`, {
       headers: {
-        Authorization: 'Bearer ' + this.token,
-      },
+        Authorization: "Bearer " + this.token
+      }
     });
 
-    const user2 = await api.get(`users/${pl2}`, {
+    const user2 = await api.get(`users/${this.player2}`, {
       headers: {
-        Authorization: 'Bearer ' + this.token,
-      },
+        Authorization: "Bearer " + this.token
+      }
     });
+
     this.p2 = (
       <Player
         name={this.gameData.data.player2}
-        playerColor={'#f5f9ff'}
+        playerColor={"#f5f9ff"}
         data={user2.data}
       />
     );
 
-    if (this.gameData.data.player1won !== undefined) history.push('/');
+    window.addEventListener("resize", this.onResize);
 
-    window.addEventListener('resize', this.onResize);
+    //this.socket.on("game", this.onGameComm); // TODO
 
-    this.socket.on('game', this.onGameComm);
-    this.socket.on('system', this.onSystemMsg);
     this.init(this.gameData, user1, user2);
   }
 
@@ -139,42 +142,54 @@ class GameWindow extends React.Component {
     this.p1 = (
       <Player
         name={gameData.data.player1}
-        playerColor={'#383b40'}
+        playerColor={"#383b40"}
         data={user1.data}
       />
     );
     this.p2 = (
       <Player
         name={gameData.data.player2}
-        playerColor={'#f5f9ff'}
+        playerColor={"#f5f9ff"}
         data={user2.data}
       />
     );
-    this.un = localStorage.getItem('username');
-    this.socket.emit('online', this.un);
-    this.socket.emit('joinGame', this.roomName);
-    if (this.un === this.p1.props.name) this.ownPlayer = this.p1;
-    else if (this.un === this.p2.props.name) this.ownPlayer = this.p2;
-    else this.ownPlayer = null;
-    let canvassize = this.getNewCanvasSize();
-    this.boardSize = gameData.data.size;
+
+    this.username = localStorage.getItem("username");
+
+    //this.socket.emit("online", this.username); // TODO
+
+    this.stompClient.send(
+      `/app/joinGame/${this.player1}/${this.player2}`,
+      {},
+      this.username
+    );
+
+    if (this.username === this.p1.props.name) {
+      this.ownPlayer = this.p1;
+    } else if (this.username === this.p2.props.name) {
+      this.ownPlayer = this.p2;
+    } else {
+      this.ownPlayer = null;
+    }
+
+    this.boardSize = gameData.data.boardSize;
     let initState = {
       field: new Array(this.boardSize * this.boardSize).fill(null),
-      points: { [this.p1.props.name]: 0, [this.p2.props.name]: 0 },
+      points: { [this.p1.props.name]: 0, [this.p2.props.name]: 0 }
     };
 
     this.setState({
       loading: false,
       currentPlayer: this.p1,
-      canvasSize: canvassize,
+      canvasSize: this.getNewCanvasSize(),
       time: gameData.data.time,
       increment: gameData.data.timeIncrement,
       history: [
         {
           gameState: initState,
-          passCount: 0,
-        },
-      ],
+          passCount: 0
+        }
+      ]
     });
   }
 
@@ -182,19 +197,20 @@ class GameWindow extends React.Component {
    * #### methods handeling communications ####
    */
 
-  /**
-   * @param {Message} msg - a system Message received
-   */
-  onSystemMsg = (msg) => {
-    if (msg.type === 'DISCONNECT') {
-      this.socket.emit('chat', {
-        data: { user: 'System', msg: `${msg.user} has disconnected.` },
-        room: this.roomName,
-      });
-      this.onDisconnect(msg.user);
-    } else if (msg.type === 'JOIN') {
+  onSystemMessage = message => {
+    console.log("++++++++++++++++++++++++++++++", message);
+    console.log(typeof message);
+    console.log(message[0]);
+    if (message === "DISCONNECTED") {
+      /*this.socket.emit("chat", {
+        data: { user: "System", msg: `${msg.user} has disconnected.` },
+        room: this.roomName
+      });*/
+      // TODO
+      //this.onDisconnect(msg.user);
+    } else if (message === "JOINED") {
       // this.socket.emit('chat', { data: { user: 'System', msg: `${msg.user} has joined the room.` }, room: this.roomName });
-    } else if (msg.type === 'CONNECTION_ESTABLISHED') {
+    } else if (message === "CONNECTION_ESTABLISHED") {
       this.setState({ playersConnected: true });
     }
   };
@@ -202,19 +218,18 @@ class GameWindow extends React.Component {
   /**
    * @param {User} user - disconnected user
    */
-  onDisconnect = (user) => {
+  onDisconnect = user => {
     if (this.state.gameEnd) return;
     if (user === this.p1.props.name) this.gameHasEnded(this.state, this.p2);
-    else if (user === this.p2.props.name) this.gameHasEnded(this.state, this.p1);
+    else if (user === this.p2.props.name)
+      this.gameHasEnded(this.state, this.p1);
   };
 
   /**
    * Game Communication Handler(See Documentation)
    */
-  onGameComm = (msg) => {
-    console.log(msg);
-    console.log(this.state);
-    if (msg.sender === this.un) return;
+  onGameComm = msg => {
+    if (msg.sender === this.username) return;
     if (msg.type === msgType.MOVE) {
       this.processInput(msg.x, msg.y, msg.sender);
     } else if (msg.type === msgType.PASS) {
@@ -231,27 +246,17 @@ class GameWindow extends React.Component {
     }
   };
 
-  onResult = (updatedGame) => {
+  onResult = updatedGame => {
     this.newRatingPlayer1 = updatedGame.newRatingPlayer1;
     this.newRatingPlayer2 = updatedGame.newRatingPlayer2;
     this.setState({ waitingForResult: false, showEndWindow: true });
   };
 
-
   onTimeout = () => {
-    this.gameHasEnded(this.state, this.state.currentPlayer === this.p2 ? this.p1 : this.p2);
-  }
-
-  /**
-   * formats and sends message over socket {data: {user: #username of the sending person, msg: #message to be sent}, room: #room name of current gameWindow}
-   */
-  sendMessage = () => {
-    if (this.state.stringbuffer.length > 0)
-      this.socket.emit('chat', {
-        data: { user: this.un, msg: this.state.stringbuffer },
-        room: this.roomName,
-      });
-    this.setState({ stringbuffer: '' });
+    this.gameHasEnded(
+      this.state,
+      this.state.currentPlayer === this.p2 ? this.p1 : this.p2
+    );
   };
 
   /**
@@ -261,35 +266,36 @@ class GameWindow extends React.Component {
    */
   broadcastMove = (x, y) => {
     let data = {
-      message: { type: msgType.MOVE, x: x, y: y, sender: this.un },
-      room: this.roomName,
+      message: { type: msgType.MOVE, x: x, y: y, sender: this.username },
+      room: this.roomName
     };
 
-    this.socket.emit('game', data);
+    /*this.socket.emit("game", data);*/ // TODO
   };
 
   /**
    * passes the move
    */
   broadcastPass = () => {
-    this.socket.emit('game', {
-      message: { type: msgType.PASS, sender: this.un, player: this.ownPlayer },
-      room: this.roomName,
+    /*this.socket.emit("game", {
+      message: { type: msgType.PASS, sender: this.username, player: this.ownPlayer },
+      room: this.roomName
     });
-    this.socket.emit('chat', {
+    this.socket.emit("chat", {
       data: {
-        user: 'Game',
-        msg: `${this.un} has passed.(Round ${this.state.round})`,
+        user: "Game",
+        msg: `${this.username} has passed.(Round ${this.state.round})`
       },
-      room: this.roomName,
-    });
+      room: this.roomName
+    });*/
+    // TODO
   };
 
   /**
    * error handler for child components
    */
-  err = (state) => {
-    alert('An Error occured on Child component');
+  err = state => {
+    alert("An Error occured on Child component");
     console.log(state);
   };
 
@@ -297,10 +303,10 @@ class GameWindow extends React.Component {
    * methods manipulating / using GameStates
    */
 
-  setImmediateWin = (player) => {
+  setImmediateWin = player => {
     this.setState({ winner: player, gameEnd: true });
     this.onEnd(player);
-  }
+  };
 
   processInput = (x, y, player) => {
     if (player !== this.state.currentPlayer.props.name || this.state.gameEnd)
@@ -316,7 +322,7 @@ class GameWindow extends React.Component {
     Game.applyRulesBoard.bind(this)(newField, playerObject, enemy);
 
     if (newField[y * this.boardSize + x] !== playerObject) {
-      alert('Move is suicidal.');
+      alert("Move is suicidal.");
       return;
     }
 
@@ -324,7 +330,7 @@ class GameWindow extends React.Component {
     if (
       this.arrequals(newField, this.state.history[prevRound].gameState.field)
     ) {
-      alert('Illegal Ko move.');
+      alert("Illegal Ko move.");
       return;
     }
 
@@ -332,7 +338,7 @@ class GameWindow extends React.Component {
     this.broadcastMove(x, y);
   };
 
-  handlePass = (player) => {
+  handlePass = player => {
     if (player !== this.state.currentPlayer || this.state.gameEnd) return;
     this.pass();
     this.broadcastPass();
@@ -344,11 +350,11 @@ class GameWindow extends React.Component {
       history: this.state.history.slice(0, this.state.round + 1).concat([
         {
           gameState: this.state.history[this.state.round].gameState,
-          passCount: this.state.history[this.state.round].passCount + 1,
-        },
+          passCount: this.state.history[this.state.round].passCount + 1
+        }
       ]),
       round: this.state.round + 1,
-      currentPlayer: nextPlayer,
+      currentPlayer: nextPlayer
     };
     this.updateGame(newState);
   };
@@ -356,7 +362,7 @@ class GameWindow extends React.Component {
   /**
    * update game state when move is made
    */
-  onNextMove = (fields) => {
+  onNextMove = fields => {
     const history = this.state.history.slice(0, this.state.round + 1);
 
     let nextPlayer = this.getNextPlayer();
@@ -367,14 +373,14 @@ class GameWindow extends React.Component {
             field: fields,
             points: {
               [this.p1.props.name]: Game.getPoints(fields, this.p1),
-              [this.p2.props.name]: Game.getPoints(fields, this.p2),
-            },
+              [this.p2.props.name]: Game.getPoints(fields, this.p2)
+            }
           },
-          passCount: 0,
-        },
+          passCount: 0
+        }
       ]),
       round: history.length,
-      currentPlayer: nextPlayer,
+      currentPlayer: nextPlayer
     };
     this.updateGame(newState);
   };
@@ -385,13 +391,15 @@ class GameWindow extends React.Component {
 
   onForfeit = () => {
     if (!this.ownPlayer || this.state.gameEnd) return;
-    this.gameHasEnded(this.state, this.ownPlayer === this.p1 ? this.p2 : this.p1);
-    this.socket.emit('game', {
+    this.gameHasEnded(
+      this.state,
+      this.ownPlayer === this.p1 ? this.p2 : this.p1
+    );
+    /*this.socket.emit("game", {
       message: { type: msgType.FORFEIT, sender: this.ownPlayer.props.name },
-      room: this.roomName,
-    });
+      room: this.roomName
+    });*/ // TODO
   };
-
 
   /**
    * updates game accordingly to new game state(terminates game if passCount >= 2), automatically passes if there are no moves to be made for current player
@@ -405,7 +413,6 @@ class GameWindow extends React.Component {
       this.gameHasEnded(newState);
     }
   }
-
 
   /**
    * method called when game has ended
@@ -425,13 +432,12 @@ class GameWindow extends React.Component {
       whoIsWinning = this.p2;
 
     whoIsWinning = !player ? whoIsWinning : player;
-    this.setState({ gameEnd: true, winner:  whoIsWinning});
-
+    this.setState({ gameEnd: true, winner: whoIsWinning });
 
     if (whoIsWinning === null) {
       whoIsWinning = this.p2; // if there is a draw, white wins because of starting disadvantage
     }
-    if (whoIsWinning.props.name !== this.un) return;
+    if (whoIsWinning.props.name !== this.username) return;
 
     api
       .patch(
@@ -439,85 +445,59 @@ class GameWindow extends React.Component {
         { player1Won: whoIsWinning === this.p1 },
         {
           headers: {
-            Authorization: 'Bearer ' + this.token,
-          },
+            Authorization: "Bearer " + this.token
+          }
         }
       )
-      .then((res) => {
-        this.socket.emit('game', {
+      .then(res => {
+        /*this.socket.emit("game", {
           message: { type: msgType.RESULT, data: res.data },
-          room: this.roomName,
-        });
+          room: this.roomName
+        });*/ // TODO
         this.onResult(res.data);
       })
-      .catch((e) => {
+      .catch(e => {
         console.log(e);
       });
-  }
-
-
-  detectAnomaly(newState) {
-    let newGameState = newState.history[newState.round].gameState;
-    let enemy = this.p1 === newState.currentPlayer ? this.p2 : this.p1;
-
-    let avMoves = Game.availableMoves(
-      newGameState.field,
-      newState.currentPlayer,
-      enemy
-    );
-
-    if (!avMoves) {
-      this.setState(newState);
-      if (newState.currentPlayer === this.ownPlayer)
-        this.socket.emit('chat', {
-          data: {
-            user: 'Game',
-            msg: 'Automatic Pass because there were no moves that can be made.',
-          },
-          room: this.roomName,
-        });
-      this.pass();
-      return;
-    }
-  }
+  };
 
   /**
-   * Renders a image of flag of given country(default US)
+   * Renders a image of flag of given country (default US)
    */
-  renderFlag = (country) => {
+  renderFlag = country => {
     let altText, countryID;
     switch (country) {
-      case 'Germany':
-        altText = 'USA';
-        countryID = 'US';
+      case "Germany":
+        altText = "USA";
+        countryID = "US";
         break;
-      case 'Korea':
-        altText = 'Korea';
-        countryID = 'KR';
+      case "Korea":
+        altText = "Korea";
+        countryID = "KR";
         break;
-      case 'Taiwan':
-        altText = 'Taiwan';
-        countryID = 'TW';
+      case "Taiwan":
+        altText = "Taiwan";
+        countryID = "TW";
         break;
-      case 'Sweden':
-        altText = 'Sweden';
-        countryID = 'SE';
+      case "Sweden":
+        altText = "Sweden";
+        countryID = "SE";
         break;
-      case 'France':
-        altText = 'France';
-        countryID = 'FR';
+      case "France":
+        altText = "France";
+        countryID = "FR";
         break;
       default:
-        altText = 'Germany';
-        countryID = 'DE';
+        altText = "Germany";
+        countryID = "DE";
         break;
     }
     return (
       <img
-        width='5%'
+        width="5%"
         alt={altText}
         src={`http://catamphetamine.gitlab.io/country-flag-icons/3x2/${countryID}.svg`}
-        className='flag'
+        className="flag"
       />
     );
   };
@@ -525,56 +505,56 @@ class GameWindow extends React.Component {
   /**
    * displays player information
    */
-  playerInfo = (player) => {
+  playerInfo = player => {
     if (!player) return null;
     let playerColor = player.props.playerColor;
     return (
-      <div className='infobox'>
-        <Row type='flex' className='infoboxrow'>
+      <div className="infobox">
+        <Row type="flex" className="infoboxrow">
           <Col span={INFOBOXSYMBOLRATIO}>
-            <div className='infoboxiconcontainer'>
+            <div className="infoboxiconcontainer">
               <div
                 style={{
-                  borderRadius: '50%',
-                  border: '0',
+                  borderRadius: "50%",
+                  border: "0",
                   backgroundColor: playerColor,
-                  width: '20px',
-                  height: '20px',
+                  width: "20px",
+                  height: "20px"
                 }}
               />
             </div>
           </Col>
-          <Col>{player.props.name ? player.props.name : 'Undefined'}</Col>
+          <Col>{player.props.name ? player.props.name : "Undefined"}</Col>
         </Row>
-        <Row type='flex' className='infoboxrow'>
+        <Row type="flex" className="infoboxrow">
           <Col span={INFOBOXSYMBOLRATIO}>
-            <div className='infoboxiconcontainer'>
+            <div className="infoboxiconcontainer">
               {player.props.data.country ? (
-                <div style={{ height: 'min-content', width: 'min-content' }}>
+                <div style={{ height: "min-content", width: "min-content" }}>
                   {this.renderFlag(player.props.data.country)}
                 </div>
               ) : (
                 <div
                   style={{
-                    backgroundColor: 'white',
-                    width: '30px',
-                    height: '20px',
+                    backgroundColor: "white",
+                    width: "30px",
+                    height: "20px"
                   }}
                 />
               )}
             </div>
           </Col>
           <Col>
-            {player.props.data.country ? player.props.data.country : 'Unknown'}
+            {player.props.data.country ? player.props.data.country : "Unknown"}
           </Col>
         </Row>
-        <Row type='flex' className='infoboxrow'>
-          <Col span={INFOBOXSYMBOLRATIO} className='infoboxiconcontainer'>
-            <div className='infoboxicon'>
+        <Row type="flex" className="infoboxrow">
+          <Col span={INFOBOXSYMBOLRATIO} className="infoboxiconcontainer">
+            <div className="infoboxicon">
               <img
-                src={process.env.PUBLIC_URL + '/rank_sym.png'}
-                alt='rank_sym'
-                className='sicon'
+                src={process.env.PUBLIC_URL + "/rank_sym.png"}
+                alt="rank_sym"
+                className="sicon"
               />
             </div>
           </Col>
@@ -585,13 +565,13 @@ class GameWindow extends React.Component {
             }
           </Col>
         </Row>
-        <Row type='flex' className='infoboxrow'>
-          <Col span={INFOBOXSYMBOLRATIO} className='infoboxiconcontainer'>
-            <div className='infoboxicon'>
+        <Row type="flex" className="infoboxrow">
+          <Col span={INFOBOXSYMBOLRATIO} className="infoboxiconcontainer">
+            <div className="infoboxicon">
               <img
-                src={process.env.PUBLIC_URL + '/time_icon.png'}
-                alt='time_icon'
-                className='sicon'
+                src={process.env.PUBLIC_URL + "/time_icon.png"}
+                alt="time_icon"
+                className="sicon"
               />
             </div>
           </Col>
@@ -639,10 +619,10 @@ class GameWindow extends React.Component {
       <div>
         <Row>
           <Col span={12}>
-            <div ref={(el) => (this.gameView = el)} className='boardview'>
+            <div ref={el => (this.gameView = el)} className="boardview">
               <Board
                 boardSize={this.boardSize}
-                onClick={(x, y) => this.processInput(x, y, this.un)}
+                onClick={(x, y) => this.processInput(x, y, this.username)}
                 currField={this.state.history[this.state.round].gameState.field}
                 currPlayer={this.state.currentPlayer}
                 boardHW={this.state.canvasSize}
@@ -651,33 +631,34 @@ class GameWindow extends React.Component {
           </Col>
           <Col>
             <div
-              ref={(el) => (this.infoview = el)}
+              ref={el => (this.infoview = el)}
               style={{
-                margin: '30px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignContent: 'center',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '20px',
-                backgroundColor: '#262320',
-                borderRadius: '10px',
-                minHeight: `${this.state.canvasSize * 0.7}px`,
+                margin: "30px",
+                display: "flex",
+                flexDirection: "column",
+                alignContent: "center",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "20px",
+                backgroundColor: "#262320",
+                borderRadius: "10px",
+                minHeight: `${this.state.canvasSize * 0.7}px`
               }}
             >
               {this.displayInfo()}
               <Chat
-                user={this.un}
-                socket={this.socket}
-                roomName={this.roomName}
+                user={this.username}
+                socket={this.stompClient}
+                player1={this.player1}
+                player2={this.player2}
                 customButtons={
                   this.ownPlayer !== null
                     ? [
                         {
-                          label: 'Pass',
-                          onClick: () => this.handlePass(this.ownPlayer),
+                          label: "Pass",
+                          onClick: () => this.handlePass(this.ownPlayer)
                         },
-                        { label: 'Forfeit', onClick: this.onForfeit },
+                        { label: "Forfeit", onClick: this.onForfeit }
                       ]
                     : []
                 }
@@ -690,7 +671,7 @@ class GameWindow extends React.Component {
   };
 
   pad(num) {
-    return num < 10 ? '0' + num : num;
+    return num < 10 ? "0" + num : num;
   }
 
   gameEnded = () => {
@@ -703,38 +684,38 @@ class GameWindow extends React.Component {
       return (
         <div
           style={{
-            position: 'fixed',
+            position: "fixed",
             top: 0,
             left: 0,
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0, 0, 0, 0.6)"
           }}
         >
-          <div className='endgame__popup'>
-            <p style={{ textAlign: 'center', marginTop: 0 }}>
+          <div className="endgame__popup">
+            <p style={{ textAlign: "center", marginTop: 0 }}>
               {this.ownPlayer === null ? (
-                'Game ended'
+                "Game ended"
               ) : this.ownPlayer === this.state.winner ? (
-                <span style={{ color: '#629923' }}>You won.</span>
+                <span style={{ color: "#629923" }}>You won.</span>
               ) : (
-                <span style={{ color: '#CC3233' }}>You lost.</span>
+                <span style={{ color: "#CC3233" }}>You lost.</span>
               )}
             </p>
             {this.ownPlayer === this.p1 ? (
-              <p className='endgame__info'>
+              <p className="endgame__info">
                 <div>New rating: {this.newRatingPlayer1} </div>
                 <div>
-                  Time left:{' '}
+                  Time left:{" "}
                   {this.pad(this.p1ClockRef.current.state.minutes) +
-                    ':' +
-                    this.pad(this.p1ClockRef.current.state.seconds)}{' '}
+                    ":" +
+                    this.pad(this.p1ClockRef.current.state.seconds)}{" "}
                 </div>
                 <div>
-                  Game score:{' '}
+                  Game score:{" "}
                   {
                     this.state.history[this.state.round].gameState.points[
                       this.p1.props.name
@@ -743,16 +724,16 @@ class GameWindow extends React.Component {
                 </div>
               </p>
             ) : (
-              <p className='endgame__info'>
+              <p className="endgame__info">
                 <div>New rating: {this.newRatingPlayer2} </div>
                 <div>
-                  Time left:{' '}
+                  Time left:{" "}
                   {this.pad(this.p2ClockRef.current.state.minutes) +
-                    ':' +
+                    ":" +
                     this.pad(this.p2ClockRef.current.state.seconds)}
                 </div>
                 <div>
-                  Game score:{' '}
+                  Game score:{" "}
                   {
                     this.state.history[this.state.round].gameState.points[
                       this.p2.props.name
@@ -761,14 +742,14 @@ class GameWindow extends React.Component {
                 </div>
               </p>
             )}
-            <div className='button'>
+            <div className="button">
               <Button
-                type='primary'
+                type="primary"
                 style={{
-                  marginTop: '15px',
+                  marginTop: "15px"
                 }}
                 onClick={() => {
-                  history.push('/');
+                  history.push("/");
                   window.location.reload();
                 }}
               >
@@ -795,9 +776,9 @@ class GameWindow extends React.Component {
     return (
       <div
         style={{
-          display: 'flex',
-          alignContent: 'space-between',
-          width: '100%',
+          display: "flex",
+          alignContent: "space-between",
+          width: "100%"
         }}
       >
         {this.playerInfo(this.p1)}
@@ -819,7 +800,7 @@ class GameWindow extends React.Component {
   /**
    * equals function for arrays
    */
-  arrequals = function (array1, array2) {
+  arrequals = function(array1, array2) {
     // if the other array is a falsy value, return
     if (!array2) return false;
 
@@ -840,21 +821,21 @@ class GameWindow extends React.Component {
   };
 
   render() {
-    if (this.state.loading) return null;
+    if (this.state.loading) return null; //TODO
     if (!this.state.playersConnected)
       return <div>Waiting for players to be connected...</div>;
     return (
       <React.Fragment>
         <Prompt
           when={this.state.winner === null}
-          message='Warning: You lose when leaving the game!'
+          message="Warning: You lose when leaving the game!"
         />
-        <div className='gameView'>
-          <div className='gamewindow-header'>
-            <div style={{ padding: '5px' }}>
+        <div className="gameView">
+          <div className="gamewindow-header">
+            <div style={{ padding: "5px" }}>
               <img
-                src={process.env.PUBLIC_URL + '/ReactGo.png'}
-                alt='React_Go'
+                src={process.env.PUBLIC_URL + "/ReactGo.png"}
+                alt="React_Go"
               />
               ReactGo
             </div>
