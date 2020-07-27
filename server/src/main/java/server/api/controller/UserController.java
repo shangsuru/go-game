@@ -14,7 +14,6 @@ import server.api.repository.GameRepository;
 import server.api.repository.UserRepository;
 import server.api.security.JWTUtils;
 
-
 import javax.mail.MessagingException;
 import javax.mail.internet.MimeMessage;
 import java.util.HashMap;

@@ -26,9 +26,9 @@ import {
 import { Link } from "react-router-dom";
 
 const Main = () => {
-  const [username, setUsername] = useState(""); // Username of the user logged in
-  const [userId, setUserId] = useState(""); // Id of user logged in
-  const [ownRating, setOwnRating] = useState(""); // Rating of the user logged in
+  const [username, setUsername] = useState("");
+  const [userId, setUserId] = useState("");
+  const [ownRating, setOwnRating] = useState("");
   const [modalVisible, setModalVisible] = useState(false); // Visibility of the modal to create a game
   const [selectedBoardSize, setSelectedBoardSize] = useState(9); // 9x9, 13x13, 19x19
   const [selectedTime, setSelectedTime] = useState(5); // Time limit for each player between 5 - 40 min

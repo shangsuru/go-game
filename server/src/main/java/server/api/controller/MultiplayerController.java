@@ -21,7 +21,10 @@ public class MultiplayerController {
   @SendTo("/topic/system/{player1}/{player2}")
   public String joinGame(@DestinationVariable String player1, @DestinationVariable String player2, @RequestBody String user) {
     waitingUsers.add(user);
+
+    // Game can start when both players joined
     if (waitingUsers.contains(player1) && waitingUsers.contains(player2)) {
+      // Users are no longer waiting for game to start
       waitingUsers.removeAll(Collections.singleton(player1));
       waitingUsers.removeAll(Collections.singleton(player2));
       return "CONNECTION_ESTABLISHED";

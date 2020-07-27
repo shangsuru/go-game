@@ -36,7 +36,8 @@ public class GameController {
     Game mostRecentGame = gameRepository.findFirstByPlayer1AndPlayer2OrderByTimestampDesc(player1, player2);
 
     if (mostRecentGame.isGameTerminated()) {
-      return new ResponseEntity<>(HttpStatus.NO_CONTENT); // No active game
+      // No active game found
+      return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
     return new ResponseEntity<>(mostRecentGame, HttpStatus.OK);
@@ -45,21 +46,23 @@ public class GameController {
   @GetMapping("/{player}")
   public OwnGamesDTO getOwnGames(@PathVariable String player, @RequestParam int page) {
     List<Game> games = gameRepository.findByPlayer1OrPlayer2OrderByTimestampDesc(player, player);
+
     long wins = games.stream().filter(game -> game.isGameTerminated() &&
       (game.getPlayer1().equals(player) && game.isPlayer1Winner()
         || game.getPlayer2().equals(player) && !game.isPlayer1Winner())).count();
     long losses = games.size() - wins;
 
-    int limit = 7;
-    int skip = (page - 1) * limit; // Pagination
-    return new OwnGamesDTO(games.subList(skip, Math.min(skip + limit, games.size())), wins, losses);
+    // Pagination
+    int pageLimit = 7;
+    int skip = (page - 1) * pageLimit;
+    games = games.subList(skip, Math.min(skip + pageLimit, games.size()));
+
+    return new OwnGamesDTO(games, wins, losses);
   }
 
   @PatchMapping("/{id}")
   public ResponseEntity<Game> updateGameInfoAfterCompletion(@RequestBody JsonNode data, @PathVariable Long id) {
-    boolean player1Won = data.get("player1Won").asBoolean();
     Optional<Game> gameOptional = gameRepository.findById(id);
-
     if (gameOptional.isEmpty()) {
       return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
@@ -67,6 +70,9 @@ public class GameController {
 
     int ratingPlayer1 = game.getOldRatingPlayer1();
     int ratingPlayer2 = game.getOldRatingPlayer2();
+    boolean player1Won = data.get("player1Won").asBoolean();
+
+    // Increment winner rating and decrement loser rating for rated games
     if (game.isRated()) {
       if (player1Won) {
         ratingPlayer1 = Math.max(0, ratingPlayer1 + getRatingChange(ratingPlayer1, ratingPlayer2));
