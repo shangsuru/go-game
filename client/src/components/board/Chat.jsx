@@ -56,13 +56,13 @@ const Chat = ({ user, socket, player1, player2, customButtons }) => {
         padding: "20px"
       }}
     >
-      <div class="chatbox">
-        <div class="chatbox__messagelist">
+      <div className="chatbox">
+        <div className="chatbox__messagelist">
           {chat.map(message => {
             return displayMessage(message);
           })}
         </div>
-        <div class="chatbox__panel">
+        <div className="chatbox__panel">
           <input
             className="chatbox__input"
             value={inputText}

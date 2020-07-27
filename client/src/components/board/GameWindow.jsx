@@ -138,7 +138,6 @@ class GameWindow extends React.Component {
     );
 
     this.username = localStorage.getItem("username");
-
     this.socket.send(
       `/app/joinGame/${this.player1}/${this.player2}`,
       {},
@@ -211,7 +210,7 @@ class GameWindow extends React.Component {
     } else if (msg.type === gameMessage.PASS) {
       this.pass(msg.sender);
     } else if (msg.type === gameMessage.FORFEIT) {
-      let winner = msg.sender === this.p1.props.name ? this.p2 : this.p1; // TODO
+      let winner = msg.sender === this.player1 ? this.p2 : this.p1; // TODO
       this.gameHasEnded(this.state, winner);
     } else if (
       msg.type === gameMessage.RESULT &&
@@ -479,23 +478,13 @@ class GameWindow extends React.Component {
         <Row type="flex" className="infoboxrow">
           <Col span={INFOBOX_SYMBOL_RATIO}>
             <div className="infoboxiconcontainer">
-              {player.props.data.country ? (
-                <div style={{ height: "min-content", width: "min-content" }}>
-                  {this.renderFlag(player.props.data.country)}
-                </div>
-              ) : (
-                <div
-                  style={{
-                    backgroundColor: "white",
-                    width: "30px",
-                    height: "20px"
-                  }}
-                />
-              )}
+              <div style={{ height: "min-content", width: "min-content" }}>
+                {this.renderFlag(player.props.data.country)}
+              </div>
             </div>
           </Col>
           <Col>
-            {player.props.data.country ? player.props.data.country : "Unknown"}
+            {player.props.data.country ? player.props.data.country : "Germany"}
           </Col>
         </Row>
         <Row type="flex" className="infoboxrow">

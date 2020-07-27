@@ -14,13 +14,15 @@ import java.util.List;
 @Controller
 public class MultiplayerController {
 
-  List<String> playingUsers = new ArrayList<>();
+  List<String> waitingUsers = new ArrayList<>();
 
   @MessageMapping("/joinGame/{player1}/{player2}")
   @SendTo("/topic/system/{player1}/{player2}")
   public String joinGame(@DestinationVariable String player1, @DestinationVariable String player2, @RequestBody String user) {
-    playingUsers.add(user);
-    if (playingUsers.contains(player1) && playingUsers.contains(player2)) {
+    waitingUsers.add(user);
+    if (waitingUsers.contains(player1) && waitingUsers.contains(player2)) {
+      waitingUsers.remove(player1);
+      waitingUsers.remove(player2);
       return "CONNECTION_ESTABLISHED";
     }
 
