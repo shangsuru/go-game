@@ -416,7 +416,7 @@ class GameWindow extends React.Component {
   renderFlag = country => {
     let altText, countryID;
     switch (country) {
-      case "Germany":
+      case "USA":
         altText = "USA";
         countryID = "US";
         break;
