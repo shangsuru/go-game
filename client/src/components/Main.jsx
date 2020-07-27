@@ -92,7 +92,7 @@ const Main = () => {
         console.log(e);
         history.push("/login");
       });
-  }, []);
+  }, [socket]);
 
   const handleLogout = () => {
     // Delete token in local storage and redirect to login

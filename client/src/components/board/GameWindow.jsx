@@ -114,11 +114,10 @@ class GameWindow extends React.Component {
     );
 
     window.addEventListener("resize", this.onResize);
+    window.addEventListener("beforeunload", () => {
+      this.socket.send(`/app/leaveGame/${this.player1}/${this.player2}`);
+    });
     this.init(this.gameData, user1, user2);
-  }
-
-  componentWillUnmount() {
-    this.onForfeit();
   }
 
   init(gameData, user1, user2) {
@@ -175,32 +174,29 @@ class GameWindow extends React.Component {
 
   onSystemMessage = message => {
     if (message === "DISCONNECTED") {
+      // TODO
       this.socket.send(
         `/app/chat/${this.player1}/${this.player2}`,
         {},
         JSON.stringify({
           user: "System",
-          text: `${message.user} has disconnected.`
+          text: `Opponent has disconnected.`
         })
       );
 
-      this.onDisconnect(message.user);
-    } else if (message === "JOINED") {
-      this.socket.send(
-        `/app/chat/${this.player1}/${this.player2}`,
-        {},
-        JSON.stringify({ user: "System", text: `${message.user} has joined.` })
-      );
+      this.onDisconnect();
     } else if (message === "CONNECTION_ESTABLISHED") {
       this.setState({ playersConnected: true });
     }
   };
 
-  onDisconnect = user => {
+  onDisconnect = () => {
+    // TODO
     if (this.state.gameEnd) return;
-    if (user === this.p1.props.name) this.gameHasEnded(this.state, this.p2);
-    else if (user === this.p2.props.name)
+    if (this.username === this.p1.props.name)
       this.gameHasEnded(this.state, this.p1);
+    else if (this.username === this.p2.props.name)
+      this.gameHasEnded(this.state, this.p2);
   };
 
   onGameCommunication = msg => {
@@ -210,14 +206,14 @@ class GameWindow extends React.Component {
     } else if (msg.type === gameMessage.PASS) {
       this.pass(msg.sender);
     } else if (msg.type === gameMessage.FORFEIT) {
-      let winner = msg.sender === this.player1 ? this.p2 : this.p1; // TODO
+      let winner = msg.sender === this.player1 ? this.p2 : this.p1;
       this.gameHasEnded(this.state, winner);
     } else if (
       msg.type === gameMessage.RESULT &&
       this.state.gameEnd &&
       this.state.waitingForResult
     ) {
-      this.onResult(msg.data);
+      this.onResult(msg.game);
     }
   };
 
@@ -253,7 +249,7 @@ class GameWindow extends React.Component {
     let passMessage = { type: gameMessage.PASS, sender: this.username };
     let chatNotification = {
       user: "Game",
-      text: `${this.username} has passed. (Round ${this.state.round}`
+      text: `${this.username} has passed.`
     };
 
     this.socket.send(
@@ -348,6 +344,7 @@ class GameWindow extends React.Component {
 
   onForfeit = () => {
     if (!this.ownPlayer || this.state.gameEnd) return;
+    console.log("WE ARE HERE!!"); // TODO
     this.gameHasEnded(
       this.state,
       this.ownPlayer === this.p1 ? this.p2 : this.p1
@@ -405,7 +402,7 @@ class GameWindow extends React.Component {
       .then(res => {
         let resultMessage = { type: gameMessage.RESULT, game: res.data };
         this.socket.send(
-          `app/game/${this.player1}/${this.player2}`,
+          `/app/game/${this.player1}/${this.player2}`,
           {},
           JSON.stringify(resultMessage)
         );

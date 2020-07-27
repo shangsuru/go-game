@@ -9,6 +9,7 @@ import server.api.model.ChatMessage;
 import server.api.model.GameMessage;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Controller
@@ -21,12 +22,18 @@ public class MultiplayerController {
   public String joinGame(@DestinationVariable String player1, @DestinationVariable String player2, @RequestBody String user) {
     waitingUsers.add(user);
     if (waitingUsers.contains(player1) && waitingUsers.contains(player2)) {
-      waitingUsers.remove(player1);
-      waitingUsers.remove(player2);
+      waitingUsers.removeAll(Collections.singleton(player1));
+      waitingUsers.removeAll(Collections.singleton(player2));
       return "CONNECTION_ESTABLISHED";
     }
 
     return "JOINED";
+  }
+
+  @MessageMapping("/leaveGame/{player1}/{player2}")
+  @SendTo("/topic/system/{player1}/{player2}")
+  public String leaveGame(@DestinationVariable String player1, @DestinationVariable String player2) {
+    return "DISCONNECTED";
   }
 
   @MessageMapping("/chat/{player1}/{player2}")
