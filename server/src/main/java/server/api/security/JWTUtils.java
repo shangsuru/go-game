@@ -5,6 +5,8 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -19,24 +21,28 @@ import static com.auth0.jwt.algorithms.Algorithm.HMAC512;
 
 @Component
 public class JWTUtils {
-  private final String SECRET = "secret";
-  private final long EXPIRATION_TIME = 86_400_000; // 1 day
 
-  @Autowired
+  private final long EXPIRATION_TIME = 86_400_000; // 1 day
+  private final String secret;
   private CustomUserDetailsService userDetailsService;
+
+  public JWTUtils(Environment env, CustomUserDetailsService userDetailsService) {
+    this.userDetailsService = userDetailsService;
+    this.secret = env.getProperty("security.jwt.token.secret");
+  }
 
   public String createJWT(String username) {
     return JWT.create()
       .withSubject(username)
       .withExpiresAt(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
-      .sign(HMAC512(SECRET.getBytes()));
+      .sign(HMAC512(secret.getBytes()));
   }
 
   public String createJWT(String username, long expirationTime) {
     return JWT.create()
       .withSubject(username)
       .withExpiresAt(new Date(System.currentTimeMillis() + expirationTime))
-      .sign(HMAC512(SECRET.getBytes()));
+      .sign(HMAC512(secret.getBytes()));
   }
 
   public Authentication getAuthentication(String token) {
@@ -50,7 +56,7 @@ public class JWTUtils {
 
   public boolean validateJWT(String token) {
     try {
-      DecodedJWT jwt = JWT.require(Algorithm.HMAC512(SECRET.getBytes())).build().verify(token);
+      DecodedJWT jwt = JWT.require(Algorithm.HMAC512(secret.getBytes())).build().verify(token);
       return true;
     } catch (JWTVerificationException e) {
       return false;

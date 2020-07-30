@@ -3,6 +3,6 @@
     {
       "name": "security.jwt.token.secret",
       "type": "java.lang.String",
-      "description": "Description for security.jwt.token.secret."
-  }
-] }
+      "description": "Secret for signing JWT."
+    }
+  ] }
