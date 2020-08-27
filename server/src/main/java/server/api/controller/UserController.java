@@ -120,7 +120,7 @@ public class UserController {
       return new ResponseEntity<>("USER_NOT_FOUND", HttpStatus.NO_CONTENT);
     }
 
-    String token = jwtUtils.createJWT(userOptional.get().getUsername(), 300000); // 5 minutes
+    String token = jwtUtils.createJWT(userOptional.get().getUsername(), 1800000); // valid for 30 minutes
 
     MimeMessage mimeMessage = mailSender.createMimeMessage();
     MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
