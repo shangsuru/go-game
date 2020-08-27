@@ -94,10 +94,15 @@ const Main = () => {
       });
   }, [socket]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     // Delete token in local storage and redirect to login
     localStorage.removeItem("jwt");
     localStorage.removeItem("username");
+    await api.get("/users/logout", {
+      headers: {
+        Authorization: "Bearer " + authToken
+      }
+    });
     history.push("/login");
   };
 

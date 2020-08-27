@@ -174,7 +174,6 @@ class GameWindow extends React.Component {
 
   onSystemMessage = message => {
     if (message === "DISCONNECTED") {
-      // TODO
       this.socket.send(
         `/app/chat/${this.player1}/${this.player2}`,
         {},
@@ -191,7 +190,6 @@ class GameWindow extends React.Component {
   };
 
   onDisconnect = () => {
-    // TODO
     if (this.state.gameEnd) return;
     if (this.username === this.p1.props.name)
       this.gameHasEnded(this.state, this.p1);
@@ -344,7 +342,6 @@ class GameWindow extends React.Component {
 
   onForfeit = () => {
     if (!this.ownPlayer || this.state.gameEnd) return;
-    console.log("WE ARE HERE!!"); // TODO
     this.gameHasEnded(
       this.state,
       this.ownPlayer === this.p1 ? this.p2 : this.p1

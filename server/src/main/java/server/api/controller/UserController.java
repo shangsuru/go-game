@@ -47,17 +47,25 @@ public class UserController {
 
     user.setPassword(bCryptPasswordEncoder.encode(user.getPassword()));
     userRepository.save(user);
-    return new ResponseEntity<>(jwtUtils.createJWT(user.getUsername()), HttpStatus.CREATED);
+    return new ResponseEntity<>(jwtUtils.createJWT(user.getUsername(), 86_400_000), HttpStatus.CREATED);
   }
 
   @PostMapping("/login")
   public ResponseEntity<String> login(@RequestBody User user) {
     Optional<User> userData = userRepository.findByUsername(user.getUsername());
     if (userData.isPresent() && bCryptPasswordEncoder.matches(user.getPassword(), userData.get().getPassword())) {
-      return new ResponseEntity<>(jwtUtils.createJWT(user.getUsername()), HttpStatus.OK);
+      return new ResponseEntity<>(jwtUtils.createJWT(user.getUsername(), 86_400_000), HttpStatus.OK);
     } else {
       return new ResponseEntity<>("Wrong username or password", HttpStatus.BAD_REQUEST);
     }
+  }
+
+  @GetMapping("/logout")
+  public String logout() {
+    User user = ((User) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+    user.setToken(null); // Invalidate currently active token
+    userRepository.save(user);
+    return "User successfully logged out.";
   }
 
   @GetMapping("/me")

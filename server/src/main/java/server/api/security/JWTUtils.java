@@ -12,9 +12,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
+import server.api.model.User;
+import server.api.repository.UserRepository;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.Date;
+import java.util.Optional;
 
 import static com.auth0.jwt.algorithms.Algorithm.HMAC512;
 
@@ -25,24 +28,24 @@ public class JWTUtils {
   private final long EXPIRATION_TIME = 86_400_000; // 1 day
   private final String secret;
   private CustomUserDetailsService userDetailsService;
+  private UserRepository userRepository;
 
-  public JWTUtils(Environment env, CustomUserDetailsService userDetailsService) {
+  public JWTUtils(Environment env, CustomUserDetailsService userDetailsService, UserRepository userRepository) {
     this.userDetailsService = userDetailsService;
+    this.userRepository = userRepository;
     this.secret = env.getProperty("security.jwt.token.secret");
   }
 
-  public String createJWT(String username) {
-    return JWT.create()
-      .withSubject(username)
-      .withExpiresAt(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
-      .sign(HMAC512(secret.getBytes()));
-  }
-
   public String createJWT(String username, long expirationTime) {
-    return JWT.create()
+    String token =  JWT.create()
       .withSubject(username)
       .withExpiresAt(new Date(System.currentTimeMillis() + expirationTime))
       .sign(HMAC512(secret.getBytes()));
+
+    User user = this.userRepository.findByUsername(username).get();
+    user.setToken(token);
+    userRepository.save(user);
+    return token;
   }
 
   public Authentication getAuthentication(String token) {
@@ -57,6 +60,18 @@ public class JWTUtils {
   public boolean validateJWT(String token) {
     try {
       DecodedJWT jwt = JWT.require(Algorithm.HMAC512(secret.getBytes())).build().verify(token);
+
+      // Check if the JWT is set for the user as the active token
+      Optional<User> userOpt = this.userRepository.findByUsername(getUsernameFromJWT(token));
+
+      if (userOpt.isEmpty()) {
+        return false;
+      }
+      User user = userOpt.get();
+      if (!token.equals(user.getToken())) {
+        return false;
+      }
+
       return true;
     } catch (JWTVerificationException e) {
       return false;
