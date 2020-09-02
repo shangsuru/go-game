@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from "react";
+import Stomp from "stompjs";
+import SockJS from "sockjs-client";
 
-const Chat = ({ user, socket, player1, player2, customButtons }) => {
+const Chat = ({ user, player1, player2, customButtons }) => {
   const [inputText, setInputText] = useState("");
   const [chat, setChat] = useState([]);
-
+  let socket = Stomp.over(new SockJS("http://localhost:8080/ws"));
   useEffect(() => {
-    socket.subscribe(`/topic/chat/${player1}/${player2}`, frame => {
-      let message = JSON.parse(frame.body);
-      setChat([...chat, message]);
+    socket.connect({}, () => {
+      socket.subscribe(`/topic/chat/${player1}/${player2}`, frame => {
+        let message = JSON.parse(frame.body);
+        setChat([...chat, message]);
+      });
     });
-  }, [socket, player1, player2, chat]);
+  }, [chat]);
 
   const sendMessage = () => {
     if (inputText.length > 0) {

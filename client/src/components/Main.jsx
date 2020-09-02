@@ -75,7 +75,6 @@ const Main = () => {
           // Get notified when someone accepts challenge
           socket.subscribe(`/topic/acceptChallenge/${username}`, frame => {
             let challenge = JSON.parse(frame.body);
-            alert(`${challenge.opponent} has accepted your challenge`);
             history.push(
               `/game?player1=${challenge.creator}&player2=${challenge.opponent}`
             );

@@ -41,12 +41,12 @@ class GameWindow extends React.Component {
       boardToScreenRatio: 0.85,
       canvasSize: 300,
       showEndWindow: false,
-      playersConnected: false,
+      playersConnected: true,
       waitingForResult: true
     };
   }
 
-  async componentDidMount() {
+  async componentWillMount() {
     this.token = localStorage.getItem("jwt");
 
     // Redirect to login page if user is without token
@@ -66,7 +66,7 @@ class GameWindow extends React.Component {
 
     // Set up communication between the two players
     this.socket = Stomp.over(new SockJS("http://localhost:8080/ws"));
-    await this.socket.connect({}, () => {
+    this.socket.connect({}, () => {
       this.socket.subscribe(
         `/topic/system/${this.player1}/${this.player2}`,
         frame => this.onSystemMessage(frame.body)
@@ -137,11 +137,12 @@ class GameWindow extends React.Component {
     );
 
     this.username = localStorage.getItem("username");
-    this.socket.send(
-      `/app/joinGame/${this.player1}/${this.player2}`,
-      {},
-      this.username
-    );
+    if (this.socket.status === "CONNECTED")
+      this.socket.send(
+        `/app/joinGame/${this.player1}/${this.player2}`,
+        {},
+        this.username
+      );
 
     if (this.username === this.p1.props.name) {
       this.ownPlayer = this.p1;
