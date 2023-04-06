@@ -1,0 +1,31 @@
+version: '3'
+services:
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: go
+    ports:
+      - "5432:5432"
+
+  api:
+    depends_on:
+      - db
+    restart: always
+    build:
+      dockerfile: Dockerfile
+      context: ./server
+    ports:
+      - "8080:8080"
+
+  client:
+    depends_on:
+      - api
+    stdin_open: true
+    build:
+      dockerfile: Dockerfile
+      context: ./client
+    ports:
+      - "3000:3000"
